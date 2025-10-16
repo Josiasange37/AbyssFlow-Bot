@@ -2,10 +2,7 @@
 nixPkgs = ['nodejs-20_x']
 
 [phases.install]
-cmds = ['npm ci']
-
-[phases.build]
-cmds = []
+cmds = ['npm install']
 
 [start]
 cmd = 'node abyssflow.js'
