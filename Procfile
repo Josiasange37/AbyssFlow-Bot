@@ -1,1 +1,1 @@
-worker: node abyssflow.js
+worker: node index.js
