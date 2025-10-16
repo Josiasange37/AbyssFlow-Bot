@@ -1,3 +1,41 @@
+const express = require("express");
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(express.json());
+
+// Route de base
+app.get("/", (req, res) => {
+  res.send("🤖 AbyssFlow Bot is running!");
+});
+
+// Garder le bot actif
+setInterval(() => {
+  console.log("🔄 Keep-alive ping");
+}, 60000);
+
+// Gestion des erreurs globales
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+// Démarrer le serveur Express
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  startBot().catch(console.error);
+});
+
+// Gestion de la fermeture propre
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received. Shutting down gracefully");
+  server.close(() => {
+    console.log("Server closed");
+    process.exit(0);
+  });
+});
+
+
 #!/usr/bin/env node
 
 const {
@@ -10,7 +48,6 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs-extra');
 const https = require('https');
 const path = require('path');
-const cron = require('node-cron');
 require('dotenv').config();
 
 const FALLBACK_VERSION = [2, 3000, 38];
@@ -2054,14 +2091,6 @@ process.on('unhandledRejection', (reason, promise) => {
     const bot = new AbyssFlow();
     await bot.start();
     log.info('Bot started successfully');
-    
-    // Keep-alive mechanism for Railway/Heroku
-    // Runs every 5 minutes to prevent the bot from sleeping
-    cron.schedule('*/5 * * * *', () => {
-      log.info('🔄 Keep-alive ping - Bot is active');
-    });
-    
-    log.info('✅ Keep-alive mechanism activated');
   } catch (error) {
     log.error('Fatal error during startup:', error);
     process.exit(1);

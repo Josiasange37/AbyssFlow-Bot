@@ -5,3 +5,9 @@ node_modules/
 data/
 *.log
 *.session.json
+session/
+auth_info_baileys/
+.DS_Store
+*.swp
+*.swo
+*~
