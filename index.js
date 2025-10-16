@@ -468,6 +468,26 @@ class AbyssFlow {
         }
         break;
       
+      case 'promote':
+        if (!isGroup) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande fonctionne uniquement dans les groupes!', { quotedMessage: message });
+        } else if (!canUseAdminCommands) {
+          await this.sendSafeMessage(chatId, '❌ Seuls le créateur et les admins peuvent utiliser cette commande!', { quotedMessage: message });
+        } else {
+          await this.cmdPromote(chatId, message, args);
+        }
+        break;
+      
+      case 'demote':
+        if (!isGroup) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande fonctionne uniquement dans les groupes!', { quotedMessage: message });
+        } else if (!canUseAdminCommands) {
+          await this.sendSafeMessage(chatId, '❌ Seuls le créateur et les admins peuvent utiliser cette commande!', { quotedMessage: message });
+        } else {
+          await this.cmdDemote(chatId, message, args);
+        }
+        break;
+      
       case 'botstatus':
       case 'botinfo':
         if (!isGroup) {
@@ -583,6 +603,16 @@ class AbyssFlow {
       `  • \`${prefix}add 237XXXXXXXXX\` - Ajouter un membre`,
       `  • \`${prefix}invite 237XXX 237YYY\` - Plusieurs membres`,
       `  ⚠️ Le bot doit être admin`,
+      '',
+      `*${prefix}promote* - Promouvoir en admin`,
+      `  • \`${prefix}promote @user\` - Promouvoir un membre`,
+      `  • \`${prefix}promote @user1 @user2\` - Plusieurs membres`,
+      `  ⚠️ Le bot doit être admin`,
+      '',
+      `*${prefix}demote* - Révoquer un admin`,
+      `  • \`${prefix}demote @admin\` - Révoquer un admin`,
+      `  • \`${prefix}demote @admin1 @admin2\` - Plusieurs admins`,
+      `  ⚠️ Peut révoquer même le créateur du groupe!`,
       '',
       `*${prefix}tagall* - Mentionner tous les membres`,
       `  • \`${prefix}tagall\` - Annonce par défaut`,
@@ -1592,6 +1622,256 @@ class AbyssFlow {
     } catch (error) {
       log.error('Failed to kick members:', error.message);
       await this.sendSafeMessage(groupId, `❌ Erreur lors de l'expulsion: ${error.message}`);
+    }
+  }
+
+  async cmdPromote(groupId, message, args) {
+    try {
+      // Extract mentioned users from the message
+      const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      
+      // Check if there are any mentions
+      if (mentionedJids.length === 0) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Aucun membre mentionné!*`,
+          '',
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}promote @user1 @user2 ...\``,
+          '',
+          `*Exemples:*`,
+          `• \`${CONFIG.prefix}promote @user\` - Promouvoir un membre`,
+          `• \`${CONFIG.prefix}promote @user1 @user2\` - Promouvoir plusieurs`,
+          '',
+          `⚠️ *Note:* Mentionnez les membres à promouvoir en admin`
+        ].join('\n'));
+        return;
+      }
+
+      // Get group metadata to check bot's admin status
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      
+      // Find bot's JID
+      const possibleBotJids = [
+        this.sock.user.id,
+        this.sock.user.id.replace(/:\d+/, '@s.whatsapp.net'),
+        this.sock.user.id.split(':')[0] + '@s.whatsapp.net',
+        this.sock.user.id.split('@')[0] + '@s.whatsapp.net'
+      ];
+      
+      let botParticipant = null;
+      for (const jid of possibleBotJids) {
+        botParticipant = groupMetadata.participants.find(p => p.id === jid);
+        if (botParticipant) break;
+      }
+      
+      // Check if bot is admin
+      if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Le bot doit être admin du groupe!*`,
+          '',
+          `📊 *Statut actuel:* Membre normal`,
+          '',
+          `💡 *Pour rendre le bot admin:*`,
+          `1. Infos du groupe → Participants`,
+          `2. Trouvez le bot dans la liste`,
+          `3. Appuyez longuement → "Promouvoir en admin"`
+        ].join('\n'));
+        return;
+      }
+
+      // Get current admins
+      const currentAdmins = groupMetadata.participants
+        .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
+        .map(p => p.id);
+
+      const membersToPromote = [];
+      const alreadyAdmins = [];
+
+      for (const jid of mentionedJids) {
+        if (currentAdmins.includes(jid)) {
+          alreadyAdmins.push(jid);
+        } else {
+          membersToPromote.push(jid);
+        }
+      }
+
+      // Show info if some are already admins
+      if (alreadyAdmins.length > 0) {
+        const adminList = alreadyAdmins.map(jid => `• @${jid.split('@')[0]}`).join('\n');
+        await this.sendSafeMessage(groupId, [
+          `ℹ️ *Déjà administrateur(s):*`,
+          '',
+          adminList
+        ].join('\n'), { mentions: alreadyAdmins });
+      }
+
+      // Promote the members
+      if (membersToPromote.length > 0) {
+        await this.sock.groupParticipantsUpdate(groupId, membersToPromote, 'promote');
+        
+        const promotedList = membersToPromote.map(jid => `• @${jid.split('@')[0]}`).join('\n');
+        
+        await this.sock.sendMessage(groupId, {
+          text: [
+            `✅ *Promotion réussie!*`,
+            '',
+            `👑 *${membersToPromote.length} nouveau(x) admin(s):*`,
+            promotedList,
+            '',
+            `🎉 Félicitations pour votre promotion!`,
+            '',
+            `🌊 _Action effectuée par le Water Hashira_`
+          ].join('\n'),
+          mentions: membersToPromote
+        });
+
+        log.info(`Promoted ${membersToPromote.length} member(s) in ${groupId}`);
+      } else if (alreadyAdmins.length > 0) {
+        // Only already-admins were mentioned
+        return;
+      } else {
+        await this.sendSafeMessage(groupId, '❌ Aucun membre valide à promouvoir!');
+      }
+
+    } catch (error) {
+      log.error('Failed to promote members:', error.message);
+      await this.sendSafeMessage(groupId, `❌ Erreur lors de la promotion: ${error.message}`);
+    }
+  }
+
+  async cmdDemote(groupId, message, args) {
+    try {
+      // Extract mentioned users from the message
+      const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      
+      // Check if there are any mentions
+      if (mentionedJids.length === 0) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Aucun membre mentionné!*`,
+          '',
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}demote @admin1 @admin2 ...\``,
+          '',
+          `*Exemples:*`,
+          `• \`${CONFIG.prefix}demote @admin\` - Révoquer un admin`,
+          `• \`${CONFIG.prefix}demote @admin1 @admin2\` - Révoquer plusieurs`,
+          '',
+          `⚠️ *Note:* Mentionnez les admins à révoquer`,
+          `⚠️ *Attention:* Peut révoquer même le créateur du groupe!`
+        ].join('\n'));
+        return;
+      }
+
+      // Get group metadata to check bot's admin status
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      
+      // Find bot's JID
+      const possibleBotJids = [
+        this.sock.user.id,
+        this.sock.user.id.replace(/:\d+/, '@s.whatsapp.net'),
+        this.sock.user.id.split(':')[0] + '@s.whatsapp.net',
+        this.sock.user.id.split('@')[0] + '@s.whatsapp.net'
+      ];
+      
+      let botParticipant = null;
+      for (const jid of possibleBotJids) {
+        botParticipant = groupMetadata.participants.find(p => p.id === jid);
+        if (botParticipant) break;
+      }
+      
+      // Check if bot is admin
+      if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Le bot doit être admin du groupe!*`,
+          '',
+          `📊 *Statut actuel:* Membre normal`,
+          '',
+          `💡 *Pour rendre le bot admin:*`,
+          `1. Infos du groupe → Participants`,
+          `2. Trouvez le bot dans la liste`,
+          `3. Appuyez longuement → "Promouvoir en admin"`
+        ].join('\n'));
+        return;
+      }
+
+      // Get current admins
+      const currentAdmins = groupMetadata.participants
+        .filter(p => p.admin === 'admin' || p.admin === 'superadmin')
+        .map(p => p.id);
+
+      const membersToDemote = [];
+      const notAdmins = [];
+      const groupCreators = [];
+
+      for (const jid of mentionedJids) {
+        const participant = groupMetadata.participants.find(p => p.id === jid);
+        
+        if (!currentAdmins.includes(jid)) {
+          notAdmins.push(jid);
+        } else if (participant && participant.admin === 'superadmin') {
+          // Warn about demoting group creator but still allow it
+          groupCreators.push(jid);
+          membersToDemote.push(jid);
+        } else {
+          membersToDemote.push(jid);
+        }
+      }
+
+      // Show info if some are not admins
+      if (notAdmins.length > 0) {
+        const notAdminList = notAdmins.map(jid => `• @${jid.split('@')[0]}`).join('\n');
+        await this.sendSafeMessage(groupId, [
+          `ℹ️ *Déjà membre(s) normal(aux):*`,
+          '',
+          notAdminList
+        ].join('\n'), { mentions: notAdmins });
+      }
+
+      // Warn if demoting group creator(s)
+      if (groupCreators.length > 0) {
+        const creatorList = groupCreators.map(jid => `• @${jid.split('@')[0]}`).join('\n');
+        await this.sendSafeMessage(groupId, [
+          `⚠️ *ATTENTION: Révocation du créateur du groupe!*`,
+          '',
+          creatorList,
+          '',
+          `Cette action va révoquer le créateur du groupe.`,
+          `Procédure en cours...`
+        ].join('\n'), { mentions: groupCreators });
+      }
+
+      // Demote the members
+      if (membersToDemote.length > 0) {
+        await this.sock.groupParticipantsUpdate(groupId, membersToDemote, 'demote');
+        
+        const demotedList = membersToDemote.map(jid => `• @${jid.split('@')[0]}`).join('\n');
+        
+        await this.sock.sendMessage(groupId, {
+          text: [
+            `✅ *Révocation réussie!*`,
+            '',
+            `👤 *${membersToDemote.length} admin(s) révoqué(s):*`,
+            demotedList,
+            '',
+            groupCreators.length > 0 ? `⚠️ Créateur(s) du groupe révoqué(s)` : '',
+            `📊 Statut: Membre normal`,
+            '',
+            `🌊 _Action effectuée par le Water Hashira_`
+          ].filter(Boolean).join('\n'),
+          mentions: membersToDemote
+        });
+
+        log.info(`Demoted ${membersToDemote.length} admin(s) in ${groupId}`);
+      } else if (notAdmins.length > 0) {
+        // Only non-admins were mentioned
+        return;
+      } else {
+        await this.sendSafeMessage(groupId, '❌ Aucun admin valide à révoquer!');
+      }
+
+    } catch (error) {
+      log.error('Failed to demote admins:', error.message);
+      await this.sendSafeMessage(groupId, `❌ Erreur lors de la révocation: ${error.message}`);
     }
   }
 
