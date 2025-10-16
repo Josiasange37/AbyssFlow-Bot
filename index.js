@@ -10,6 +10,7 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs-extra');
 const https = require('https');
 const path = require('path');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const FALLBACK_VERSION = [2, 3000, 38];
@@ -2053,6 +2054,14 @@ process.on('unhandledRejection', (reason, promise) => {
     const bot = new AbyssFlow();
     await bot.start();
     log.info('Bot started successfully');
+    
+    // Keep-alive mechanism for Railway/Heroku
+    // Runs every 5 minutes to prevent the bot from sleeping
+    cron.schedule('*/5 * * * *', () => {
+      log.info('🔄 Keep-alive ping - Bot is active');
+    });
+    
+    log.info('✅ Keep-alive mechanism activated');
   } catch (error) {
     log.error('Fatal error during startup:', error);
     process.exit(1);
