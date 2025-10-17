@@ -136,6 +136,16 @@ async function simulateTyping(sock, chatId, durationMs = 3000) {
   }
 }
 
+// Timeout wrapper to prevent hanging operations
+async function withTimeout(promise, timeoutMs = 30000, errorMessage = 'Opération timeout') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    )
+  ]);
+}
+
 // Calculate realistic typing duration based on message length
 function calculateTypingDuration(messageLength) {
   // Average typing speed: 40 words per minute = ~200 characters per minute
@@ -1751,35 +1761,60 @@ class AbyssFlow {
     const delay = Math.min(minDelay + (formattedText.length / 10), maxDelay);
 
     try {
-      await this.sock.sendPresenceUpdate('composing', jid);
-      await sleep(delay);
-      
-      const maxChunkSize = 1000;
-      const chunks = [];
-      for (let i = 0; i < formattedText.length; i += maxChunkSize) {
-        chunks.push(formattedText.substring(i, i + maxChunkSize));
-      }
-
-      for (const chunk of chunks) {
-        const messageOptions = { 
-          text: chunk,
-          contextInfo: { isForwarded: false, forwardingScore: 0 }
-        };
+      // Wrap entire operation in timeout (30 seconds max)
+      await withTimeout(async () => {
+        await this.sock.sendPresenceUpdate('composing', jid);
+        await sleep(delay);
         
-        // Add quoted message if provided
-        if (quotedMessage) {
-          messageOptions.quoted = quotedMessage;
+        const maxChunkSize = 1000;
+        const chunks = [];
+        for (let i = 0; i < formattedText.length; i += maxChunkSize) {
+          chunks.push(formattedText.substring(i, i + maxChunkSize));
+        }
+
+        for (const chunk of chunks) {
+          const messageOptions = { 
+            text: chunk,
+            contextInfo: { isForwarded: false, forwardingScore: 0 }
+          };
+          
+          // Add quoted message if provided (ALWAYS quote user messages)
+          if (quotedMessage) {
+            messageOptions.quoted = quotedMessage;
+          }
+          
+          await this.sock.sendMessage(jid, messageOptions);
+          if (chunks.length > 1) await sleep(300);
         }
         
-        await this.sock.sendMessage(jid, messageOptions);
-        if (chunks.length > 1) await sleep(300);
-      }
+        await this.sock.sendPresenceUpdate('paused', jid);
+      }, 30000, 'Message envoi timeout (30s)');
       
-      await this.sock.sendPresenceUpdate('paused', jid);
     } catch (error) {
-      log.error('Send failure:', error.message);
-      if (formattedText !== text) {
-        try { await this.sock.sendMessage(jid, { text }); } catch (e) {}
+      if (error.message.includes('timeout')) {
+        log.error('Send timeout:', error.message);
+        // Try to send a simpler error message
+        try {
+          await this.sock.sendMessage(jid, { 
+            text: '❌ Erreur: Opération trop longue (timeout). Réessayez plus tard.',
+            quoted: quotedMessage 
+          });
+        } catch (e) {
+          log.error('Failed to send timeout message:', e.message);
+        }
+      } else {
+        log.error('Send failure:', error.message);
+        // Fallback to plain text
+        if (formattedText !== text) {
+          try { 
+            await this.sock.sendMessage(jid, { 
+              text,
+              quoted: quotedMessage 
+            }); 
+          } catch (e) {
+            log.error('Fallback send failed:', e.message);
+          }
+        }
       }
     }
   }
@@ -3142,7 +3177,8 @@ class AbyssFlow {
             '',
             `🌊 _Extrait par le Water Hashira - Anti Vue Unique_`
           ].filter(line => line !== '').join('\n'),
-          mentions: [sender]
+          mentions: [sender],
+          quoted: message
         });
         log.info('View once image extracted successfully');
       } 
@@ -3159,7 +3195,8 @@ class AbyssFlow {
             '',
             `🌊 _Extrait par le Water Hashira - Anti Vue Unique_`
           ].filter(line => line !== '').join('\n'),
-          mentions: [sender]
+          mentions: [sender],
+          quoted: message
         });
         log.info('View once video extracted successfully');
       }
@@ -3168,7 +3205,8 @@ class AbyssFlow {
         await this.sock.sendMessage(chatId, {
           audio: actualMessage.audioMessage.url ? { url: actualMessage.audioMessage.url } : actualMessage.audioMessage,
           mimetype: actualMessage.audioMessage.mimetype,
-          ptt: actualMessage.audioMessage.ptt || false
+          ptt: actualMessage.audioMessage.ptt || false,
+          quoted: message
         });
         await this.sendSafeMessage(chatId, [
           `🎵 *Audio Vue Unique Extrait*`,
@@ -3176,7 +3214,7 @@ class AbyssFlow {
           `👤 *Envoyé par:* ${senderName}`,
           '',
           `🌊 _Extrait par le Water Hashira - Anti Vue Unique_`
-        ].join('\n'), { mentions: [sender] });
+        ].join('\n'), { mentions: [sender], quotedMessage: message });
         log.info('View once audio extracted successfully');
       }
       else {
@@ -3340,49 +3378,56 @@ class AbyssFlow {
 
       log.info(`Converting ${mediaType} to sticker in ${chatId}`);
 
-      // Download the media
-      let buffer = await downloadMediaMessage(
-        quotedMessage ? { message: quotedMessage } : message,
-        'buffer',
-        {},
-        { logger: log, reuploadRequest: this.sock.updateMediaMessage }
-      );
+      // Download and convert with timeout (60 seconds max)
+      await withTimeout(async () => {
+        // Download the media
+        let buffer = await downloadMediaMessage(
+          quotedMessage ? { message: quotedMessage } : message,
+          'buffer',
+          {},
+          { logger: log, reuploadRequest: this.sock.updateMediaMessage }
+        );
 
-      // For images, resize and optimize for sticker (512x512 max, WebP format)
-      if (mediaType === 'image') {
-        try {
-          buffer = await sharp(buffer)
-            .resize(512, 512, {
-              fit: 'contain',
-              background: { r: 0, g: 0, b: 0, alpha: 0 }
-            })
-            .webp({ quality: 95 })
-            .toBuffer();
-          log.info('Image resized and optimized for sticker');
-        } catch (resizeError) {
-          log.warn('Failed to resize image, using original:', resizeError.message);
+        // For images, resize and optimize for sticker (512x512 max, WebP format)
+        if (mediaType === 'image') {
+          try {
+            buffer = await sharp(buffer)
+              .resize(512, 512, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+              })
+              .webp({ quality: 95 })
+              .toBuffer();
+            log.info('Image resized and optimized for sticker');
+          } catch (resizeError) {
+            log.warn('Failed to resize image, using original:', resizeError.message);
+          }
         }
-      }
 
-      // Send as sticker
-      await this.sock.sendMessage(chatId, {
-        sticker: buffer,
-        quoted: message
-      });
+        // Send as sticker
+        await this.sock.sendMessage(chatId, {
+          sticker: buffer,
+          quoted: message
+        });
 
-      log.info(`Successfully converted ${mediaType} to sticker`);
+        log.info(`Successfully converted ${mediaType} to sticker`);
+      }, 60000, 'Conversion en sticker timeout (60s)');
 
     } catch (error) {
       log.error('Failed to convert to sticker:', error.message, error.stack);
+      
+      const isTimeout = error.message.includes('timeout');
       await this.sendSafeMessage(chatId, [
         `❌ *Erreur lors de la conversion*`,
         '',
-        `Impossible de convertir en sticker.`,
+        isTimeout ? `⏱️ Opération trop longue (timeout 60s)` : `Impossible de convertir en sticker.`,
         '',
         `Raisons possibles:`,
-        `• Fichier trop volumineux`,
-        `• Format non supporté`,
+        isTimeout ? `• Fichier trop volumineux (réduisez la taille)` : `• Fichier trop volumineux`,
+        isTimeout ? `• Connexion lente` : `• Format non supporté`,
         `• Vidéo trop longue (max 10s)`,
+        '',
+        `💡 *Solution:* ${isTimeout ? 'Réduisez la taille du fichier et réessayez' : 'Vérifiez le format et la taille'}`,
         '',
         `🌊 _Water Hashira_`
       ].join('\n'), { quotedMessage: message });
@@ -3426,34 +3471,41 @@ class AbyssFlow {
 
       log.info(`Converting sticker to image in ${chatId}`);
 
-      // Download the sticker
-      const buffer = await downloadMediaMessage(
-        quotedMessage ? { message: quotedMessage } : message,
-        'buffer',
-        {},
-        { logger: log, reuploadRequest: this.sock.updateMediaMessage }
-      );
+      // Download and convert with timeout (60 seconds max)
+      await withTimeout(async () => {
+        // Download the sticker
+        const buffer = await downloadMediaMessage(
+          quotedMessage ? { message: quotedMessage } : message,
+          'buffer',
+          {},
+          { logger: log, reuploadRequest: this.sock.updateMediaMessage }
+        );
 
-      // Send as image
-      await this.sock.sendMessage(chatId, {
-        image: buffer,
-        caption: `📸 *Sticker Converti en Image*\n\n🌊 _Water Hashira_`,
-        quoted: message
-      });
+        // Send as image
+        await this.sock.sendMessage(chatId, {
+          image: buffer,
+          caption: `📸 *Sticker Converti en Image*\n\n🌊 _Water Hashira_`,
+          quoted: message
+        });
 
-      log.info('Successfully converted sticker to image');
+        log.info('Successfully converted sticker to image');
+      }, 60000, 'Conversion en image timeout (60s)');
 
     } catch (error) {
       log.error('Failed to convert to image:', error.message, error.stack);
+      
+      const isTimeout = error.message.includes('timeout');
       await this.sendSafeMessage(chatId, [
         `❌ *Erreur lors de la conversion*`,
         '',
-        `Impossible de convertir en image.`,
+        isTimeout ? `⏱️ Opération trop longue (timeout 60s)` : `Impossible de convertir en image.`,
         '',
         `Raisons possibles:`,
-        `• Sticker animé non supporté`,
-        `• Erreur de téléchargement`,
+        isTimeout ? `• Sticker trop volumineux` : `• Sticker animé non supporté`,
+        isTimeout ? `• Connexion lente` : `• Erreur de téléchargement`,
         `• Format corrompu`,
+        '',
+        `💡 *Solution:* ${isTimeout ? 'Réessayez avec un sticker plus petit' : 'Vérifiez le format du sticker'}`,
         '',
         `🌊 _Water Hashira_`
       ].join('\n'), { quotedMessage: message });
