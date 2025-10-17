@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useSearchParams } from 'next/navigation'
 import { 
   Droplets, 
   Mail, 
@@ -17,6 +18,7 @@ import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 
 export default function LoginPage() {
+  const searchParams = useSearchParams()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [method, setMethod] = useState<'qr' | 'phone'>('qr')
   const [showPassword, setShowPassword] = useState(false)
@@ -32,6 +34,15 @@ export default function LoginPage() {
     name: '',
     plan: 'free'
   })
+
+  // Check URL params and switch to register mode if needed
+  useEffect(() => {
+    const modeParam = searchParams.get('mode')
+    if (modeParam === 'register') {
+      setMode('register')
+      setMethod('phone') // Switch to phone/email method for registration
+    }
+  }, [searchParams])
 
   // Check payment status on mount
   useState(() => {
