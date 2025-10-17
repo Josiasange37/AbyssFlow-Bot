@@ -881,6 +881,18 @@ class AbyssFlow {
         await this.cmdViewOnce(chatId, message);
         break;
       
+      case 'sticker':
+      case 'stiker':
+      case 's':
+        await this.cmdToSticker(chatId, message);
+        break;
+      
+      case 'toimage':
+      case 'toimg':
+      case 'topng':
+        await this.cmdToImage(chatId, message);
+        break;
+      
       default:
         if (isOwner) {
           await this.sendSafeMessage(chatId, `unknown command: ${cmd}\n\nType *help for available commands`, { quotedMessage: message });
@@ -991,6 +1003,18 @@ class AbyssFlow {
       `  • Renvoie l'image/vidéo en vue normale`,
       `  • \`${prefix}antiviewonce\` - Alias`,
       `  • \`${prefix}revealvo\` - Alias`,
+      `  ⚠️ Tous les utilisateurs`,
+      '',
+      `*${prefix}sticker* - Image/Vidéo → Sticker 🎨`,
+      `  • Envoyez une image avec \`${prefix}sticker\``,
+      `  • Ou répondez à une image/vidéo`,
+      `  • \`${prefix}s\` - Alias court`,
+      `  ⚠️ Tous les utilisateurs`,
+      '',
+      `*${prefix}toimage* - Sticker → Image 🖼️`,
+      `  • Envoyez un sticker avec \`${prefix}toimage\``,
+      `  • Ou répondez à un sticker`,
+      `  • \`${prefix}toimg\` - Alias`,
       `  ⚠️ Tous les utilisateurs`
     ];
 
@@ -2917,6 +2941,157 @@ class AbyssFlow {
         `• Le média a expiré`,
         `• Le message n'est pas une vue unique`,
         `• Erreur de connexion`,
+        '',
+        `🌊 _Water Hashira_`
+      ].join('\n'), { quotedMessage: message });
+    }
+  }
+
+  async cmdToSticker(chatId, message) {
+    try {
+      // Check if message has image/video or is replying to one
+      const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      const currentMessage = message.message;
+      
+      let mediaMessage = null;
+      let mediaType = null;
+
+      // Check current message first
+      if (currentMessage?.imageMessage) {
+        mediaMessage = currentMessage.imageMessage;
+        mediaType = 'image';
+      } else if (currentMessage?.videoMessage) {
+        mediaMessage = currentMessage.videoMessage;
+        mediaType = 'video';
+      }
+      // Then check quoted message
+      else if (quotedMessage?.imageMessage) {
+        mediaMessage = quotedMessage.imageMessage;
+        mediaType = 'image';
+      } else if (quotedMessage?.videoMessage) {
+        mediaMessage = quotedMessage.videoMessage;
+        mediaType = 'video';
+      }
+
+      if (!mediaMessage) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucune image/vidéo détectée!*`,
+          '',
+          `*💡 Utilisation:*`,
+          `1. Envoyez une image/vidéo avec \`${CONFIG.prefix}sticker\``,
+          `2. Ou répondez à une image/vidéo avec \`${CONFIG.prefix}sticker\``,
+          '',
+          `*Exemples:*`,
+          `• \`${CONFIG.prefix}sticker\` - Convertir en sticker`,
+          `• \`${CONFIG.prefix}s\` - Alias court`,
+          '',
+          `⚠️ *Note:* Vidéos limitées à 10 secondes`,
+          '',
+          `🌊 _Water Hashira - Convertisseur de Stickers_`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
+      log.info(`Converting ${mediaType} to sticker in ${chatId}`);
+
+      // Download the media
+      const buffer = await downloadMediaMessage(
+        quotedMessage ? { message: quotedMessage } : message,
+        'buffer',
+        {},
+        { logger: log, reuploadRequest: this.sock.updateMediaMessage }
+      );
+
+      // Send as sticker
+      await this.sock.sendMessage(chatId, {
+        sticker: buffer,
+        quoted: message
+      });
+
+      log.info(`Successfully converted ${mediaType} to sticker`);
+
+    } catch (error) {
+      log.error('Failed to convert to sticker:', error.message, error.stack);
+      await this.sendSafeMessage(chatId, [
+        `❌ *Erreur lors de la conversion*`,
+        '',
+        `Impossible de convertir en sticker.`,
+        '',
+        `Raisons possibles:`,
+        `• Fichier trop volumineux`,
+        `• Format non supporté`,
+        `• Vidéo trop longue (max 10s)`,
+        '',
+        `🌊 _Water Hashira_`
+      ].join('\n'), { quotedMessage: message });
+    }
+  }
+
+  async cmdToImage(chatId, message) {
+    try {
+      // Check if message has sticker or is replying to one
+      const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      const currentMessage = message.message;
+      
+      let stickerMessage = null;
+
+      // Check current message first
+      if (currentMessage?.stickerMessage) {
+        stickerMessage = currentMessage.stickerMessage;
+      }
+      // Then check quoted message
+      else if (quotedMessage?.stickerMessage) {
+        stickerMessage = quotedMessage.stickerMessage;
+      }
+
+      if (!stickerMessage) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucun sticker détecté!*`,
+          '',
+          `*💡 Utilisation:*`,
+          `1. Envoyez un sticker avec \`${CONFIG.prefix}toimage\``,
+          `2. Ou répondez à un sticker avec \`${CONFIG.prefix}toimage\``,
+          '',
+          `*Exemples:*`,
+          `• \`${CONFIG.prefix}toimage\` - Convertir en image`,
+          `• \`${CONFIG.prefix}toimg\` - Alias`,
+          `• \`${CONFIG.prefix}topng\` - Alias`,
+          '',
+          `🌊 _Water Hashira - Convertisseur d'Images_`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
+      log.info(`Converting sticker to image in ${chatId}`);
+
+      // Download the sticker
+      const buffer = await downloadMediaMessage(
+        quotedMessage ? { message: quotedMessage } : message,
+        'buffer',
+        {},
+        { logger: log, reuploadRequest: this.sock.updateMediaMessage }
+      );
+
+      // Send as image
+      await this.sock.sendMessage(chatId, {
+        image: buffer,
+        caption: `📸 *Sticker Converti en Image*\n\n🌊 _Water Hashira_`,
+        quoted: message
+      });
+
+      log.info('Successfully converted sticker to image');
+
+    } catch (error) {
+      log.error('Failed to convert to image:', error.message, error.stack);
+      await this.sendSafeMessage(chatId, [
+        `❌ *Erreur lors de la conversion*`,
+        '',
+        `Impossible de convertir en image.`,
+        '',
+        `Raisons possibles:`,
+        `• Sticker animé non supporté`,
+        `• Erreur de téléchargement`,
+        `• Format corrompu`,
         '',
         `🌊 _Water Hashira_`
       ].join('\n'), { quotedMessage: message });
