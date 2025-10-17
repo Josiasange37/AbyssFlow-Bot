@@ -488,6 +488,28 @@ class AbyssFlow {
         }
         break;
       
+      case 'open':
+      case 'unlock':
+        if (!isGroup) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande fonctionne uniquement dans les groupes!', { quotedMessage: message });
+        } else if (!canUseAdminCommands) {
+          await this.sendSafeMessage(chatId, '❌ Seuls le créateur et les admins peuvent utiliser cette commande!', { quotedMessage: message });
+        } else {
+          await this.cmdOpenGroup(chatId, message);
+        }
+        break;
+      
+      case 'close':
+      case 'lock':
+        if (!isGroup) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande fonctionne uniquement dans les groupes!', { quotedMessage: message });
+        } else if (!canUseAdminCommands) {
+          await this.sendSafeMessage(chatId, '❌ Seuls le créateur et les admins peuvent utiliser cette commande!', { quotedMessage: message });
+        } else {
+          await this.cmdCloseGroup(chatId, message);
+        }
+        break;
+      
       case 'botstatus':
       case 'botinfo':
         if (!isGroup) {
@@ -613,6 +635,16 @@ class AbyssFlow {
       `  • \`${prefix}demote @admin\` - Révoquer un admin`,
       `  • \`${prefix}demote @admin1 @admin2\` - Plusieurs admins`,
       `  ⚠️ Peut révoquer même le créateur du groupe!`,
+      '',
+      `*${prefix}open* - Ouvrir le groupe`,
+      `  • \`${prefix}open\` - Tous les membres peuvent écrire`,
+      `  • \`${prefix}unlock\` - Alias`,
+      `  ⚠️ Seuls admins et owners`,
+      '',
+      `*${prefix}close* - Fermer le groupe`,
+      `  • \`${prefix}close\` - Seuls les admins peuvent écrire`,
+      `  • \`${prefix}lock\` - Alias`,
+      `  ⚠️ Seuls admins et owners`,
       '',
       `*${prefix}tagall* - Mentionner tous les membres`,
       `  • \`${prefix}tagall\` - Annonce par défaut`,
@@ -1872,6 +1904,96 @@ class AbyssFlow {
     } catch (error) {
       log.error('Failed to demote admins:', error.message);
       await this.sendSafeMessage(groupId, `❌ Erreur lors de la révocation: ${error.message}`);
+    }
+  }
+
+  async cmdOpenGroup(groupId, message) {
+    try {
+      // Get group metadata
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      const groupName = groupMetadata.subject || 'Groupe';
+
+      // Change group settings to allow all participants to send messages
+      await this.sock.groupSettingUpdate(groupId, 'not_announcement');
+      
+      await this.sock.sendMessage(groupId, {
+        text: [
+          `🔓 *Groupe Ouvert!*`,
+          '',
+          `📢 *${groupName}*`,
+          '',
+          `✅ Tous les membres peuvent maintenant envoyer des messages`,
+          `💬 Le groupe est ouvert à la discussion`,
+          '',
+          `🌊 _Action effectuée par le Water Hashira_`
+        ].join('\n'),
+        quoted: message
+      });
+
+      log.info(`Group ${groupId} opened (not_announcement mode)`);
+
+    } catch (error) {
+      log.error('Failed to open group:', error.message);
+      
+      // Check if error is due to lack of permissions
+      if (error.message.includes('not-authorized') || error.message.includes('forbidden')) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Impossible d'ouvrir le groupe!*`,
+          '',
+          `⚠️ Seuls les admins du groupe peuvent modifier ces paramètres.`,
+          '',
+          `💡 *Note:* Cette commande change les paramètres WhatsApp du groupe,`,
+          `elle nécessite que l'utilisateur soit admin du groupe (pas le bot).`
+        ].join('\n'));
+      } else {
+        await this.sendSafeMessage(groupId, `❌ Erreur lors de l'ouverture du groupe: ${error.message}`);
+      }
+    }
+  }
+
+  async cmdCloseGroup(groupId, message) {
+    try {
+      // Get group metadata
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      const groupName = groupMetadata.subject || 'Groupe';
+
+      // Change group settings to only allow admins to send messages
+      await this.sock.groupSettingUpdate(groupId, 'announcement');
+      
+      await this.sock.sendMessage(groupId, {
+        text: [
+          `🔒 *Groupe Fermé!*`,
+          '',
+          `📢 *${groupName}*`,
+          '',
+          `🛡️ Seuls les admins peuvent maintenant envoyer des messages`,
+          `📵 Les membres normaux ne peuvent plus écrire`,
+          '',
+          `💡 *Pour rouvrir:* Utilisez \`${CONFIG.prefix}open\``,
+          '',
+          `🌊 _Action effectuée par le Water Hashira_`
+        ].join('\n'),
+        quoted: message
+      });
+
+      log.info(`Group ${groupId} closed (announcement mode)`);
+
+    } catch (error) {
+      log.error('Failed to close group:', error.message);
+      
+      // Check if error is due to lack of permissions
+      if (error.message.includes('not-authorized') || error.message.includes('forbidden')) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Impossible de fermer le groupe!*`,
+          '',
+          `⚠️ Seuls les admins du groupe peuvent modifier ces paramètres.`,
+          '',
+          `💡 *Note:* Cette commande change les paramètres WhatsApp du groupe,`,
+          `elle nécessite que l'utilisateur soit admin du groupe (pas le bot).`
+        ].join('\n'));
+      } else {
+        await this.sendSafeMessage(groupId, `❌ Erreur lors de la fermeture du groupe: ${error.message}`);
+      }
     }
   }
 
