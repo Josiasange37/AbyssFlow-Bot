@@ -125,7 +125,7 @@ export default function Home() {
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="hover:text-primary-400 transition">Fonctionnalités</a>
               <Link href="/commands" className="hover:text-primary-400 transition">Commandes</Link>
-              <a href="#pricing" className="hover:text-primary-400 transition">Tarifs</a>
+              <Link href="/plans" className="hover:text-primary-400 transition">Tarifs</Link>
               <Link href="/about" className="hover:text-primary-400 transition">À Propos</Link>
               <Link 
                 href="/login" 
@@ -326,7 +326,7 @@ export default function Home() {
               <ul className="space-y-2 text-gray-400">
                 <li><a href="#features" className="hover:text-primary-400">Fonctionnalités</a></li>
                 <li><Link href="/commands" className="hover:text-primary-400">Commandes</Link></li>
-                <li><a href="#pricing" className="hover:text-primary-400">Tarifs</a></li>
+                <li><Link href="/plans" className="hover:text-primary-400">Tarifs</Link></li>
               </ul>
             </div>
             <div>

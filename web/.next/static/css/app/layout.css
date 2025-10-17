@@ -633,6 +633,9 @@ video {
 .flex {
   display: flex;
 }
+.inline-flex {
+  display: inline-flex;
+}
 .grid {
   display: grid;
 }
@@ -885,6 +888,9 @@ video {
 .border {
   border-width: 1px;
 }
+.border-4 {
+  border-width: 4px;
+}
 .border-b {
   border-bottom-width: 1px;
 }
@@ -917,6 +923,12 @@ video {
 }
 .border-red-500\/20 {
   border-color: rgb(239 68 68 / 0.2);
+}
+.border-blue-500\/30 {
+  border-color: rgb(59 130 246 / 0.3);
+}
+.border-t-transparent {
+  border-top-color: transparent;
 }
 .bg-blue-500 {
   --tw-bg-opacity: 1;
@@ -989,6 +1001,9 @@ video {
 }
 .bg-red-500\/20 {
   background-color: rgb(239 68 68 / 0.2);
+}
+.bg-blue-500\/20 {
+  background-color: rgb(59 130 246 / 0.2);
 }
 .bg-gradient-to-b {
   background-image: linear-gradient(to bottom, var(--tw-gradient-stops));
