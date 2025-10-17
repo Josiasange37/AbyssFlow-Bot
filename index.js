@@ -5,6 +5,7 @@ const {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
+  downloadMediaMessage,
 } = require('@whiskeysockets/baileys');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs-extra');
@@ -141,6 +142,10 @@ class AbyssFlow {
     this.githubCache = { data: null, fetchedAt: 0 };
     this.groupsDataPath = path.join(__dirname, 'data', 'groups.json');
     this.groupSettings = this.loadGroupSettings();
+    
+    // Message cache for tracking edits and deletions (max 1000 messages)
+    this.messageCache = new Map();
+    this.maxCacheSize = 1000;
 
     if (!CONFIG.owners.length) {
       log.warn('No owners configured. Set BOT_OWNERS in .env');
@@ -215,6 +220,8 @@ class AbyssFlow {
       this.sock.ev.on('creds.update', saveCreds);
       this.sock.ev.on('connection.update', (update) => this.onConnection(update));
       this.sock.ev.on('messages.upsert', (payload) => this.onMessages(payload));
+      this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
+      this.sock.ev.on('messages.delete', (deletion) => this.onMessageDelete(deletion));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
 
       this.pendingReconnect = false;
@@ -290,6 +297,9 @@ class AbyssFlow {
 
     for (const message of payload.messages || []) {
       try {
+        // Cache the message for edit/delete tracking
+        this.cacheMessage(message);
+        
         await this.handleMessage(message);
       } catch (error) {
         log.error('Message handling error:', error.message);
@@ -349,6 +359,214 @@ class AbyssFlow {
     } catch (error) {
       log.error('Failed to send goodbye message:', error.message);
     }
+  }
+
+  cacheMessage(message) {
+    try {
+      if (!message?.key?.id || !message?.message) return;
+      
+      const messageId = message.key.id;
+      const chatId = message.key.remoteJid;
+      
+      // Store message data
+      const cachedData = {
+        id: messageId,
+        chatId: chatId,
+        sender: message.key.participant || message.key.remoteJid,
+        timestamp: message.messageTimestamp || Date.now(),
+        message: message.message,
+        text: this.extractText(message),
+        hasMedia: !!(message.message?.imageMessage || message.message?.videoMessage || 
+                     message.message?.audioMessage || message.message?.documentMessage || 
+                     message.message?.stickerMessage)
+      };
+      
+      this.messageCache.set(messageId, cachedData);
+      
+      // Limit cache size
+      if (this.messageCache.size > this.maxCacheSize) {
+        const firstKey = this.messageCache.keys().next().value;
+        this.messageCache.delete(firstKey);
+      }
+    } catch (error) {
+      log.error('Failed to cache message:', error.message);
+    }
+  }
+
+  async onMessageUpdate(updates) {
+    try {
+      for (const update of updates) {
+        const messageId = update.key.id;
+        const chatId = update.key.remoteJid;
+        
+        // Check if message was edited
+        if (update.update?.message) {
+          const cachedMessage = this.messageCache.get(messageId);
+          
+          if (cachedMessage) {
+            const oldText = cachedMessage.text || '[Message sans texte]';
+            const newText = this.extractTextFromUpdate(update.update.message) || '[Message sans texte]';
+            
+            // Only notify if text actually changed
+            if (oldText !== newText) {
+              await this.notifyMessageEdit(chatId, cachedMessage.sender, oldText, newText);
+              
+              // Update cache
+              cachedMessage.text = newText;
+              cachedMessage.message = update.update.message;
+              this.messageCache.set(messageId, cachedMessage);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      log.error('Message update handling error:', error.message);
+    }
+  }
+
+  async onMessageDelete(deletion) {
+    try {
+      const { keys } = deletion;
+      
+      for (const key of keys) {
+        const messageId = key.id;
+        const chatId = key.remoteJid;
+        const cachedMessage = this.messageCache.get(messageId);
+        
+        if (cachedMessage) {
+          await this.notifyMessageDeletion(chatId, cachedMessage);
+          // Keep in cache for a bit in case of multiple delete events
+          setTimeout(() => this.messageCache.delete(messageId), 5000);
+        }
+      }
+    } catch (error) {
+      log.error('Message deletion handling error:', error.message);
+    }
+  }
+
+  async notifyMessageEdit(chatId, sender, oldText, newText) {
+    try {
+      const senderName = `@${sender.split('@')[0]}`;
+      
+      await this.sock.sendMessage(chatId, {
+        text: [
+          `✏️ *Message Modifié*`,
+          '',
+          `👤 *Utilisateur:* ${senderName}`,
+          '',
+          `📝 *Ancien message:*`,
+          `"${oldText}"`,
+          '',
+          `📝 *Nouveau message:*`,
+          `"${newText}"`,
+          '',
+          `🌊 _Détecté par le Water Hashira_`
+        ].join('\n'),
+        mentions: [sender]
+      });
+      
+      log.info(`Message edit detected in ${chatId} by ${sender}`);
+    } catch (error) {
+      log.error('Failed to notify message edit:', error.message);
+    }
+  }
+
+  async notifyMessageDeletion(chatId, cachedMessage) {
+    try {
+      const senderName = `@${cachedMessage.sender.split('@')[0]}`;
+      
+      // If message had media, try to resend it
+      if (cachedMessage.hasMedia && cachedMessage.message) {
+        await this.resendDeletedMedia(chatId, cachedMessage, senderName);
+      } else if (cachedMessage.text) {
+        // Text message
+        await this.sock.sendMessage(chatId, {
+          text: [
+            `🗑️ *Message Supprimé*`,
+            '',
+            `👤 *Utilisateur:* ${senderName}`,
+            '',
+            `📝 *Message supprimé:*`,
+            `"${cachedMessage.text}"`,
+            '',
+            `🌊 _Détecté par le Water Hashira_`
+          ].join('\n'),
+          mentions: [cachedMessage.sender]
+        });
+      }
+      
+      log.info(`Message deletion detected in ${chatId} by ${cachedMessage.sender}`);
+    } catch (error) {
+      log.error('Failed to notify message deletion:', error.message);
+    }
+  }
+
+  async resendDeletedMedia(chatId, cachedMessage, senderName) {
+    try {
+      const msg = cachedMessage.message;
+      let mediaType = 'Media';
+      let mediaMessage = null;
+      
+      if (msg.imageMessage) {
+        mediaType = 'Image';
+        mediaMessage = { image: { url: await this.downloadMedia(msg.imageMessage) }, caption: `🗑️ *Image Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_` };
+      } else if (msg.videoMessage) {
+        mediaType = 'Vidéo';
+        mediaMessage = { video: { url: await this.downloadMedia(msg.videoMessage) }, caption: `🗑️ *Vidéo Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_` };
+      } else if (msg.stickerMessage) {
+        mediaType = 'Sticker';
+        mediaMessage = { sticker: { url: await this.downloadMedia(msg.stickerMessage) } };
+        // Send text separately for stickers
+        await this.sock.sendMessage(chatId, {
+          text: `🗑️ *Sticker Supprimé*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupéré par le Water Hashira_`,
+          mentions: [cachedMessage.sender]
+        });
+      } else if (msg.audioMessage) {
+        mediaType = 'Audio';
+        mediaMessage = { audio: { url: await this.downloadMedia(msg.audioMessage) }, mimetype: msg.audioMessage.mimetype };
+      } else if (msg.documentMessage) {
+        mediaType = 'Document';
+        mediaMessage = { document: { url: await this.downloadMedia(msg.documentMessage) }, mimetype: msg.documentMessage.mimetype, fileName: msg.documentMessage.fileName };
+      }
+      
+      if (mediaMessage) {
+        if (!msg.stickerMessage) {
+          mediaMessage.mentions = [cachedMessage.sender];
+        }
+        await this.sock.sendMessage(chatId, mediaMessage);
+        log.info(`Resent deleted ${mediaType} in ${chatId}`);
+      }
+    } catch (error) {
+      log.error('Failed to resend deleted media:', error.message);
+      // Fallback to text notification
+      await this.sock.sendMessage(chatId, {
+        text: `🗑️ *Media Supprimé*\n\n👤 *Par:* ${senderName}\n\n⚠️ Impossible de récupérer le media\n\n🌊 _Water Hashira_`,
+        mentions: [cachedMessage.sender]
+      });
+    }
+  }
+
+  async downloadMedia(mediaMessage) {
+    try {
+      const buffer = await downloadMediaMessage(
+        { message: { [Object.keys(mediaMessage)[0]]: mediaMessage } },
+        'buffer',
+        {},
+        { logger: log, reuploadRequest: this.sock.updateMediaMessage }
+      );
+      return buffer;
+    } catch (error) {
+      log.error('Failed to download media:', error.message);
+      throw error;
+    }
+  }
+
+  extractTextFromUpdate(message) {
+    return message?.conversation ||
+           message?.extendedTextMessage?.text ||
+           message?.imageMessage?.caption ||
+           message?.videoMessage?.caption ||
+           '';
   }
 
   async handleMessage(message) {
