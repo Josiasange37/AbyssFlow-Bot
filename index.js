@@ -12,6 +12,7 @@ const fs = require('fs-extra');
 const https = require('https');
 const path = require('path');
 const cron = require('node-cron');
+const sharp = require('sharp');
 require('dotenv').config();
 
 const FALLBACK_VERSION = [2, 3000, 38];
@@ -2164,19 +2165,6 @@ class AbyssFlow {
         return;
       }
 
-      // Check if bot is admin
-      const isBotAdmin = await this.isBotGroupAdmin(groupId);
-      if (!isBotAdmin) {
-        await this.sendSafeMessage(groupId, [
-          `❌ *Impossible de promouvoir!*`,
-          '',
-          `⚠️ Le bot doit être admin du groupe pour promouvoir des membres.`,
-          '',
-          `💡 *Solution:* Promouvoir le bot en admin du groupe`
-        ].join('\n'), { quotedMessage: message });
-        return;
-      }
-
       // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
 
@@ -2260,19 +2248,6 @@ class AbyssFlow {
           `⚠️ *Note:* Mentionnez les admins à révoquer`,
           `⚠️ *Attention:* Peut révoquer même le créateur du groupe!`
         ].join('\n'));
-        return;
-      }
-
-      // Check if bot is admin
-      const isBotAdmin = await this.isBotGroupAdmin(groupId);
-      if (!isBotAdmin) {
-        await this.sendSafeMessage(groupId, [
-          `❌ *Impossible de révoquer!*`,
-          '',
-          `⚠️ Le bot doit être admin du groupe pour révoquer des admins.`,
-          '',
-          `💡 *Solution:* Promouvoir le bot en admin du groupe`
-        ].join('\n'), { quotedMessage: message });
         return;
       }
 
@@ -3144,12 +3119,28 @@ class AbyssFlow {
       log.info(`Converting ${mediaType} to sticker in ${chatId}`);
 
       // Download the media
-      const buffer = await downloadMediaMessage(
+      let buffer = await downloadMediaMessage(
         quotedMessage ? { message: quotedMessage } : message,
         'buffer',
         {},
         { logger: log, reuploadRequest: this.sock.updateMediaMessage }
       );
+
+      // For images, resize and optimize for sticker (512x512 max, WebP format)
+      if (mediaType === 'image') {
+        try {
+          buffer = await sharp(buffer)
+            .resize(512, 512, {
+              fit: 'contain',
+              background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .webp({ quality: 95 })
+            .toBuffer();
+          log.info('Image resized and optimized for sticker');
+        } catch (resizeError) {
+          log.warn('Failed to resize image, using original:', resizeError.message);
+        }
+      }
 
       // Send as sticker
       await this.sock.sendMessage(chatId, {
