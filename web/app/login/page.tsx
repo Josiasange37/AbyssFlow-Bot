@@ -45,7 +45,7 @@ export default function LoginPage() {
   }, [searchParams])
 
   // Check payment status on mount
-  useState(() => {
+  useEffect(() => {
     const checkPayment = async () => {
       const token = localStorage.getItem('auth-token')
       if (!token) return
@@ -64,7 +64,7 @@ export default function LoginPage() {
       }
     }
     checkPayment()
-  })
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
