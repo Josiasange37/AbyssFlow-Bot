@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Crown,
@@ -84,6 +85,22 @@ const lockedFeatures = [
 
 export default function UpgradePage() {
   const [processing, setProcessing] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [loading, setLoading] = useState(true)
+  
+  // Check authentication on mount
+  useEffect(() => {
+    const token = localStorage.getItem('auth-token')
+    
+    if (!token) {
+      alert('⚠️ Vous devez être connecté pour choisir un plan')
+      window.location.href = '/login'
+      return
+    }
+    
+    setIsAuthenticated(true)
+    setLoading(false)
+  }, [])
   
   const handleUpgrade = async (plan: string) => {
     setProcessing(true)
@@ -130,6 +147,23 @@ export default function UpgradePage() {
     } finally {
       setProcessing(false)
     }
+  }
+  
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Vérification...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  // Don't render if not authenticated
+  if (!isAuthenticated) {
+    return null
   }
   
   return (
