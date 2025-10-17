@@ -1,0 +1,15 @@
+# Railway Volume Configuration
+# This file documents the required volume configuration for Railway
+
+VOLUME_NAME=whatsapp-session
+MOUNT_PATH=/app/auth_info_baileys
+SIZE=1GB
+
+# Instructions:
+# 1. Go to Railway Dashboard → Your Service → Settings → Volumes
+# 2. Click "+ New Volume"
+# 3. Set Mount Path: /app/auth_info_baileys
+# 4. Click "Add"
+# 5. Railway will restart automatically
+# 6. Scan QR code ONE LAST TIME
+# 7. Session will persist across all future deployments!
