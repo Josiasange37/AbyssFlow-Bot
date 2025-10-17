@@ -221,7 +221,6 @@ class AbyssFlow {
       this.sock.ev.on('connection.update', (update) => this.onConnection(update));
       this.sock.ev.on('messages.upsert', (payload) => this.onMessages(payload));
       this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
-      this.sock.ev.on('messages.delete', (deletion) => this.onMessageDelete(deletion));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
 
       this.pendingReconnect = false;
@@ -399,8 +398,18 @@ class AbyssFlow {
         const messageId = update.key.id;
         const chatId = update.key.remoteJid;
         
+        // Check if message was deleted (messageStubType 68 = REVOKE)
+        if (update.update?.messageStubType === 68 || update.update?.messageStubType === 'REVOKE') {
+          const cachedMessage = this.messageCache.get(messageId);
+          
+          if (cachedMessage) {
+            await this.notifyMessageDeletion(chatId, cachedMessage);
+            // Keep in cache for a bit in case of multiple delete events
+            setTimeout(() => this.messageCache.delete(messageId), 5000);
+          }
+        }
         // Check if message was edited
-        if (update.update?.message) {
+        else if (update.update?.message) {
           const cachedMessage = this.messageCache.get(messageId);
           
           if (cachedMessage) {
@@ -421,26 +430,6 @@ class AbyssFlow {
       }
     } catch (error) {
       log.error('Message update handling error:', error.message);
-    }
-  }
-
-  async onMessageDelete(deletion) {
-    try {
-      const { keys } = deletion;
-      
-      for (const key of keys) {
-        const messageId = key.id;
-        const chatId = key.remoteJid;
-        const cachedMessage = this.messageCache.get(messageId);
-        
-        if (cachedMessage) {
-          await this.notifyMessageDeletion(chatId, cachedMessage);
-          // Keep in cache for a bit in case of multiple delete events
-          setTimeout(() => this.messageCache.delete(messageId), 5000);
-        }
-      }
-    } catch (error) {
-      log.error('Message deletion handling error:', error.message);
     }
   }
 
@@ -548,8 +537,17 @@ class AbyssFlow {
 
   async downloadMedia(mediaMessage) {
     try {
+      // Create a proper message structure for downloadMediaMessage
+      const messageType = Object.keys(mediaMessage)[0];
+      const fakeMessage = {
+        key: { id: 'fake-id' },
+        message: {
+          [messageType]: mediaMessage
+        }
+      };
+      
       const buffer = await downloadMediaMessage(
-        { message: { [Object.keys(mediaMessage)[0]]: mediaMessage } },
+        fakeMessage,
         'buffer',
         {},
         { logger: log, reuploadRequest: this.sock.updateMediaMessage }
