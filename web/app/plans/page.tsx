@@ -94,8 +94,8 @@ export default function PlansPage() {
   
   const handleSelectPlan = (planName: string) => {
     if (!isAuthenticated) {
-      alert('⚠️ Vous devez créer un compte pour choisir un plan')
-      window.location.href = '/login'
+      // Redirect to login page in register mode
+      window.location.href = '/login?mode=register'
     } else {
       window.location.href = '/dashboard/upgrade'
     }
@@ -123,7 +123,7 @@ export default function PlansPage() {
             {!isAuthenticated && (
               <div className="inline-flex items-center gap-2 bg-blue-500/20 border border-blue-500/30 px-6 py-3 rounded-lg">
                 <LogIn className="w-5 h-5 text-blue-400" />
-                <span className="text-blue-400">Vous devez être connecté pour choisir un plan</span>
+                <span className="text-blue-400">Créez un compte pour choisir un plan</span>
               </div>
             )}
           </motion.div>
@@ -197,7 +197,7 @@ export default function PlansPage() {
                 onClick={() => handleSelectPlan(plan.name)}
                 className={`block w-full py-3 ${plan.buttonColor} rounded-lg text-center font-semibold transition flex items-center justify-center gap-2`}
               >
-                {isAuthenticated ? `Passer à ${plan.name}` : 'Se connecter pour choisir'}
+                {isAuthenticated ? `Passer à ${plan.name}` : 'Créer un compte'}
                 <ArrowRight className="w-5 h-5" />
               </button>
             </motion.div>
@@ -236,11 +236,11 @@ export default function PlansPage() {
         <div className="text-center mt-8 space-y-4">
           {!isAuthenticated && (
             <Link
-              href="/login"
+              href="/login?mode=register"
               className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 rounded-lg font-semibold transition"
             >
               <LogIn className="w-5 h-5" />
-              Se connecter pour continuer
+              Créer un compte pour continuer
             </Link>
           )}
           <div>
