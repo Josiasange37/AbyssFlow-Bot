@@ -654,6 +654,75 @@ class AbyssFlow {
         });
         break;
       
+      // Legal & Privacy commands
+      case 'privacy':
+      case 'privacypolicy':
+        await this.cmdPrivacy(chatId, message);
+        break;
+      
+      case 'disclaimer':
+      case 'legal':
+        await this.cmdDisclaimer(chatId, message);
+        break;
+      
+      case 'terms':
+      case 'tos':
+        await this.cmdTerms(chatId, message);
+        break;
+      
+      // Owner commands
+      case 'broadcast':
+        if (!isOwner) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande est réservée aux propriétaires du bot!');
+        } else {
+          await this.cmdBroadcast(chatId, message, args);
+        }
+        break;
+      
+      case 'stats':
+      case 'statistics':
+        if (!isOwner) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande est réservée aux propriétaires du bot!');
+        } else {
+          await this.cmdStats(chatId, message);
+        }
+        break;
+      
+      case 'block':
+        if (!isOwner) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande est réservée aux propriétaires du bot!');
+        } else {
+          await this.cmdBlock(chatId, message, args);
+        }
+        break;
+      
+      case 'unblock':
+        if (!isOwner) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande est réservée aux propriétaires du bot!');
+        } else {
+          await this.cmdUnblock(chatId, message, args);
+        }
+        break;
+      
+      case 'join':
+        if (!isOwner) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande est réservée aux propriétaires du bot!');
+        } else {
+          await this.cmdJoin(chatId, message, args);
+        }
+        break;
+      
+      case 'leave':
+      case 'exit':
+        if (!isOwner) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande est réservée aux propriétaires du bot!');
+        } else if (!isGroup) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande fonctionne uniquement dans les groupes!');
+        } else {
+          await this.cmdLeave(chatId, message);
+        }
+        break;
+      
       // Admin commands
       case 'welcome':
         if (!isGroup) {
@@ -881,15 +950,38 @@ class AbyssFlow {
       '',
       `*⚡ Owner Commands*`,
       '',
-      `*${prefix}restart* - Redémarre le bot`,
+      `*${prefix}broadcast* - Diffuser un message`,
+      `  • \`${prefix}broadcast <message>\` - À tous les groupes`,
+      '',
       `*${prefix}stats* - Statistiques détaillées`,
-      `*${prefix}broadcast* - Message à tous`,
-      `*${prefix}eval* - Exécute du code`
+      `  • Groupes, messages, cache, uptime`,
+      '',
+      `*${prefix}block* - Bloquer un utilisateur`,
+      `  • \`${prefix}block @user\` - Bloquer`,
+      '',
+      `*${prefix}unblock* - Débloquer un utilisateur`,
+      `  • \`${prefix}unblock @user\` - Débloquer`,
+      '',
+      `*${prefix}join* - Rejoindre un groupe`,
+      `  • \`${prefix}join <lien>\` - Via lien d'invitation`,
+      '',
+      `*${prefix}leave* - Quitter un groupe`,
+      `  • \`${prefix}leave\` - Quitter le groupe actuel`
+    ];
+    
+    // Legal & Privacy commands
+    const legalCommands = [
+      '',
+      `*📜 Légal & Confidentialité*`,
+      '',
+      `*${prefix}privacy* - Politique de confidentialité`,
+      `*${prefix}disclaimer* - Avertissement légal`,
+      `*${prefix}terms* - Conditions d'utilisation`
     ];
 
     const helpText = isOwner 
-      ? [...publicCommands, ...groupCommands, ...ownerCommands].join('\n')
-      : [...publicCommands, ...groupCommands].join('\n');
+      ? [...publicCommands, ...groupCommands, ...ownerCommands, ...legalCommands].join('\n')
+      : [...publicCommands, ...groupCommands, ...legalCommands].join('\n');
 
     const footer = [
       '',
@@ -2608,6 +2700,540 @@ class AbyssFlow {
     return [hours, minutes, seconds]
       .map((value) => String(value).padStart(2, '0'))
       .join(':');
+  }
+
+  // Legal & Privacy Commands
+  async cmdPrivacy(chatId, message) {
+    const privacyText = [
+      `🔒 *POLITIQUE DE CONFIDENTIALITÉ*`,
+      ``,
+      `📅 *Dernière mise à jour:* ${new Date().toLocaleDateString('fr-FR')}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `*1️⃣ COLLECTE DE DONNÉES*`,
+      ``,
+      `Le bot collecte et stocke temporairement:`,
+      `• Identifiants WhatsApp (JID)`,
+      `• Messages texte (cache temporaire)`,
+      `• Médias partagés (cache temporaire)`,
+      `• Métadonnées des groupes`,
+      `• Paramètres de configuration`,
+      ``,
+      `*2️⃣ UTILISATION DES DONNÉES*`,
+      ``,
+      `Les données sont utilisées pour:`,
+      `• Fournir les fonctionnalités du bot`,
+      `• Détecter les modifications/suppressions`,
+      `• Gérer les permissions (owners/admins)`,
+      `• Améliorer l'expérience utilisateur`,
+      ``,
+      `*3️⃣ STOCKAGE*`,
+      ``,
+      `📦 *Cache Messages:* Max 1000 messages`,
+      `⏱️ *Durée:* Temporaire (RAM uniquement)`,
+      `🗑️ *Suppression:* Automatique au redémarrage`,
+      `💾 *Données persistantes:* Paramètres groupes uniquement`,
+      ``,
+      `*4️⃣ PARTAGE DE DONNÉES*`,
+      ``,
+      `❌ Nous NE partageons PAS vos données avec:`,
+      `• Des tiers`,
+      `• Des annonceurs`,
+      `• Des services externes`,
+      ``,
+      `✅ Accès limité aux:`,
+      `• Propriétaires du bot (owners)`,
+      `• Système de surveillance automatique`,
+      ``,
+      `*5️⃣ SÉCURITÉ*`,
+      ``,
+      `🔐 Mesures de sécurité:`,
+      `• Authentification multi-owner`,
+      `• Rate limiting anti-spam`,
+      `• Vérification des permissions`,
+      `• Logs sécurisés`,
+      ``,
+      `*6️⃣ VOS DROITS*`,
+      ``,
+      `Vous avez le droit de:`,
+      `• Demander la suppression de vos données`,
+      `• Quitter les groupes avec le bot`,
+      `• Bloquer le bot`,
+      `• Demander des informations sur vos données`,
+      ``,
+      `*7️⃣ SURVEILLANCE AUTOMATIQUE*`,
+      ``,
+      `⚠️ Le bot surveille automatiquement:`,
+      `• Messages modifiés`,
+      `• Messages supprimés`,
+      `• Médias supprimés`,
+      ``,
+      `Ces données sont affichées publiquement dans le groupe.`,
+      ``,
+      `*8️⃣ CONTACT*`,
+      ``,
+      `📧 Email: ${process.env.CONTACT_EMAIL || 'contact@almight.tech'}`,
+      `🌐 Portfolio: ${process.env.CREATOR_PORTFOLIO || 'https://almightportfolio.vercel.app/'}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `💡 *Tapez ${CONFIG.prefix}disclaimer pour l'avertissement légal*`,
+      `💡 *Tapez ${CONFIG.prefix}terms pour les conditions*`,
+      ``,
+      `🌊 _AbyssFlow Bot - Water Hashira_`
+    ].join('\n');
+
+    await this.sendSafeMessage(chatId, privacyText, { quotedMessage: message });
+  }
+
+  async cmdDisclaimer(chatId, message) {
+    const disclaimerText = [
+      `⚠️ *AVERTISSEMENT LÉGAL (DISCLAIMER)*`,
+      ``,
+      `📅 *Dernière mise à jour:* ${new Date().toLocaleDateString('fr-FR')}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `*1️⃣ UTILISATION À VOS RISQUES*`,
+      ``,
+      `Ce bot est fourni "TEL QUEL" sans garantie d'aucune sorte.`,
+      `L'utilisation du bot se fait à vos propres risques.`,
+      ``,
+      `*2️⃣ AUCUNE GARANTIE*`,
+      ``,
+      `Nous ne garantissons PAS:`,
+      `❌ La disponibilité continue du service`,
+      `❌ L'absence de bugs ou d'erreurs`,
+      `❌ La compatibilité avec toutes les versions WhatsApp`,
+      `❌ La récupération de tous les messages supprimés`,
+      ``,
+      `*3️⃣ RESPONSABILITÉ LIMITÉE*`,
+      ``,
+      `Les créateurs et propriétaires du bot ne sont PAS responsables:`,
+      `• Des dommages directs ou indirects`,
+      `• De la perte de données`,
+      `• Des interruptions de service`,
+      `• Des actions des utilisateurs du bot`,
+      `• Des conflits dans les groupes`,
+      ``,
+      `*4️⃣ CONFORMITÉ WHATSAPP*`,
+      ``,
+      `⚠️ *IMPORTANT:*`,
+      `• Ce bot utilise WhatsApp de manière non officielle`,
+      `• WhatsApp peut bloquer les comptes utilisant des bots`,
+      `• Utilisez un numéro secondaire recommandé`,
+      `• Nous ne sommes pas affiliés à WhatsApp/Meta`,
+      ``,
+      `*5️⃣ SURVEILLANCE AUTOMATIQUE*`,
+      ``,
+      `🔍 Le bot surveille et expose publiquement:`,
+      `• Les messages modifiés`,
+      `• Les messages supprimés`,
+      `• Les médias supprimés`,
+      ``,
+      `⚠️ Cela peut créer des tensions dans les groupes.`,
+      `En utilisant ce bot, vous acceptez cette fonctionnalité.`,
+      ``,
+      `*6️⃣ CONTENU UTILISATEUR*`,
+      ``,
+      `Nous ne sommes PAS responsables:`,
+      `• Du contenu partagé par les utilisateurs`,
+      `• Des messages offensants ou illégaux`,
+      `• Des violations de droits d'auteur`,
+      `• Des conflits entre utilisateurs`,
+      ``,
+      `*7️⃣ MODIFICATIONS*`,
+      ``,
+      `Nous nous réservons le droit de:`,
+      `• Modifier le bot à tout moment`,
+      `• Arrêter le service sans préavis`,
+      `• Bloquer des utilisateurs`,
+      `• Quitter des groupes`,
+      ``,
+      `*8️⃣ JURIDICTION*`,
+      ``,
+      `🌍 Ce bot est hébergé au: *Cameroun*`,
+      `⚖️ Lois applicables: Lois camerounaises`,
+      ``,
+      `*9️⃣ ACCEPTATION*`,
+      ``,
+      `En utilisant ce bot, vous acceptez:`,
+      `✅ Cette clause de non-responsabilité`,
+      `✅ La politique de confidentialité`,
+      `✅ Les conditions d'utilisation`,
+      `✅ Les risques associés`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `💡 *Tapez ${CONFIG.prefix}privacy pour la politique de confidentialité*`,
+      `💡 *Tapez ${CONFIG.prefix}terms pour les conditions*`,
+      ``,
+      `🌊 _AbyssFlow Bot - Water Hashira_`
+    ].join('\n');
+
+    await this.sendSafeMessage(chatId, disclaimerText, { quotedMessage: message });
+  }
+
+  async cmdTerms(chatId, message) {
+    const termsText = [
+      `📜 *CONDITIONS D'UTILISATION*`,
+      ``,
+      `📅 *Dernière mise à jour:* ${new Date().toLocaleDateString('fr-FR')}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `*1️⃣ ACCEPTATION DES CONDITIONS*`,
+      ``,
+      `En utilisant AbyssFlow Bot, vous acceptez:`,
+      `✅ Ces conditions d'utilisation`,
+      `✅ La politique de confidentialité`,
+      `✅ L'avertissement légal (disclaimer)`,
+      ``,
+      `❌ Si vous n'acceptez pas, n'utilisez pas le bot.`,
+      ``,
+      `*2️⃣ UTILISATION AUTORISÉE*`,
+      ``,
+      `✅ Vous POUVEZ:`,
+      `• Utiliser le bot dans vos groupes`,
+      `• Inviter le bot dans plusieurs groupes`,
+      `• Utiliser toutes les commandes publiques`,
+      `• Configurer les paramètres (si admin)`,
+      ``,
+      `❌ Vous NE POUVEZ PAS:`,
+      `• Spammer les commandes`,
+      `• Abuser des fonctionnalités`,
+      `• Tenter de pirater le bot`,
+      `• Utiliser le bot pour du harcèlement`,
+      `• Violer les lois locales`,
+      ``,
+      `*3️⃣ COMMANDES RÉSERVÉES*`,
+      ``,
+      `👑 *Owners uniquement:*`,
+      `• broadcast, stats, block, unblock`,
+      `• join, leave`,
+      ``,
+      `🛡️ *Admins + Owners:*`,
+      `• kick, add, promote, demote`,
+      `• open, close, welcome, goodbye`,
+      `• tagall`,
+      ``,
+      `👥 *Tous les utilisateurs:*`,
+      `• help, ping, about, links`,
+      `• github, whoami`,
+      `• privacy, disclaimer, terms`,
+      ``,
+      `*4️⃣ SURVEILLANCE AUTOMATIQUE*`,
+      ``,
+      `🔍 *Fonctionnalité automatique:*`,
+      `Le bot surveille et expose publiquement:`,
+      `• Messages modifiés (avant/après)`,
+      `• Messages supprimés (récupération)`,
+      `• Médias supprimés (renvoi)`,
+      ``,
+      `⚠️ Cette fonctionnalité est TOUJOURS active.`,
+      `Elle ne peut pas être désactivée.`,
+      ``,
+      `*5️⃣ COMPORTEMENT INTERDIT*`,
+      ``,
+      `🚫 Strictement interdit:`,
+      `• Spam de commandes (>12/minute)`,
+      `• Contenu illégal ou offensant`,
+      `• Harcèlement d'autres utilisateurs`,
+      `• Tentatives de contournement des limites`,
+      `• Reverse engineering du bot`,
+      ``,
+      `*6️⃣ SANCTIONS*`,
+      ``,
+      `En cas de violation, nous pouvons:`,
+      `⚠️ Bloquer votre numéro`,
+      `⚠️ Faire quitter le bot de vos groupes`,
+      `⚠️ Signaler aux autorités (si illégal)`,
+      ``,
+      `*7️⃣ DONNÉES ET CONFIDENTIALITÉ*`,
+      ``,
+      `📦 Le bot stocke temporairement:`,
+      `• Messages (cache de 1000 max)`,
+      `• Médias (temporaire)`,
+      `• Paramètres de groupes`,
+      ``,
+      `🗑️ Suppression automatique au redémarrage.`,
+      ``,
+      `*8️⃣ DISPONIBILITÉ DU SERVICE*`,
+      ``,
+      `⚠️ Le bot peut être indisponible:`,
+      `• Maintenance`,
+      `• Mises à jour`,
+      `• Problèmes techniques`,
+      `• Décision des propriétaires`,
+      ``,
+      `Aucun remboursement (service gratuit).`,
+      ``,
+      `*9️⃣ MODIFICATIONS DES CONDITIONS*`,
+      ``,
+      `Nous pouvons modifier ces conditions à tout moment.`,
+      `La date de mise à jour sera modifiée.`,
+      `Continuer à utiliser le bot = acceptation des nouvelles conditions.`,
+      ``,
+      `*🔟 RÉSILIATION*`,
+      ``,
+      `Vous pouvez arrêter d'utiliser le bot à tout moment:`,
+      `• Supprimez le bot du groupe`,
+      `• Bloquez le numéro du bot`,
+      `• Demandez au owner de quitter`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `*📞 CONTACT*`,
+      ``,
+      `📧 Email: ${process.env.CONTACT_EMAIL || 'contact@almight.tech'}`,
+      `👤 Créateur: ${process.env.CREATOR_NAME || 'Josias Almight'}`,
+      `🌐 Portfolio: ${process.env.CREATOR_PORTFOLIO || 'https://almightportfolio.vercel.app/'}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `💡 *Tapez ${CONFIG.prefix}privacy pour la confidentialité*`,
+      `💡 *Tapez ${CONFIG.prefix}disclaimer pour l'avertissement*`,
+      ``,
+      `🌊 _AbyssFlow Bot - Water Hashira_`
+    ].join('\n');
+
+    await this.sendSafeMessage(chatId, termsText, { quotedMessage: message });
+  }
+
+  // Owner Commands
+  async cmdBroadcast(chatId, message, args) {
+    try {
+      if (args.length === 0) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucun message fourni!*`,
+          ``,
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}broadcast <message>\``,
+          ``,
+          `*Exemple:*`,
+          `\`${CONFIG.prefix}broadcast Mise à jour importante!\``
+        ].join('\n'));
+        return;
+      }
+
+      const broadcastMessage = args.join(' ');
+      const chats = await this.sock.groupFetchAllParticipating();
+      const groups = Object.values(chats).filter(chat => chat.id.endsWith('@g.us'));
+
+      await this.sendSafeMessage(chatId, `📢 Diffusion en cours vers ${groups.length} groupes...`);
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const group of groups) {
+        try {
+          await this.sock.sendMessage(group.id, {
+            text: [
+              `📢 *ANNONCE DU CRÉATEUR*`,
+              ``,
+              broadcastMessage,
+              ``,
+              `━━━━━━━━━━━━━━━━━━━━`,
+              `🌊 _AbyssFlow Bot - Water Hashira_`
+            ].join('\n')
+          });
+          successCount++;
+          await sleep(2000); // Délai anti-spam
+        } catch (error) {
+          failCount++;
+          log.error(`Broadcast failed for ${group.id}:`, error.message);
+        }
+      }
+
+      await this.sendSafeMessage(chatId, [
+        `✅ *Diffusion terminée!*`,
+        ``,
+        `📊 *Résultats:*`,
+        `• Succès: ${successCount}`,
+        `• Échecs: ${failCount}`,
+        `• Total: ${groups.length}`
+      ].join('\n'));
+
+      log.info(`Broadcast completed: ${successCount}/${groups.length} successful`);
+    } catch (error) {
+      log.error('Broadcast error:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors de la diffusion: ${error.message}`);
+    }
+  }
+
+  async cmdStats(chatId, message) {
+    try {
+      const chats = await this.sock.groupFetchAllParticipating();
+      const groups = Object.values(chats).filter(chat => chat.id.endsWith('@g.us'));
+      
+      const uptime = Date.now() - this.metrics.startedAt;
+      const memoryUsage = process.memoryUsage();
+
+      const statsText = [
+        `📊 *STATISTIQUES DU BOT*`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `*⏱️ UPTIME*`,
+        `• Démarré: ${new Date(this.metrics.startedAt).toLocaleString('fr-FR')}`,
+        `• Durée: ${this.formatDuration(uptime)}`,
+        ``,
+        `*👥 GROUPES*`,
+        `• Total: ${groups.length}`,
+        `• Actifs: ${groups.filter(g => g.announce === false).length}`,
+        ``,
+        `*💬 MESSAGES*`,
+        `• Cache actuel: ${this.messageCache.size}/${this.maxCacheSize}`,
+        `• Commandes traitées: ${this.commandCount}`,
+        ``,
+        `*💾 MÉMOIRE*`,
+        `• RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB`,
+        `• Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+        `• Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+        ``,
+        `*⚙️ SYSTÈME*`,
+        `• Node.js: ${process.version}`,
+        `• Platform: ${process.platform}`,
+        `• Arch: ${process.arch}`,
+        ``,
+        `*👑 OWNERS*`,
+        `• Total: ${CONFIG.owners.length}`,
+        `• Liste: ${CONFIG.owners.join(', ')}`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ``,
+        `🌊 _AbyssFlow Bot - Water Hashira_`
+      ].join('\n');
+
+      await this.sendSafeMessage(chatId, statsText, { quotedMessage: message });
+    } catch (error) {
+      log.error('Stats error:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors de la récupération des stats: ${error.message}`);
+    }
+  }
+
+  async cmdBlock(chatId, message, args) {
+    try {
+      const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      
+      if (mentionedJids.length === 0) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucun utilisateur mentionné!*`,
+          ``,
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}block @user\``
+        ].join('\n'));
+        return;
+      }
+
+      for (const jid of mentionedJids) {
+        await this.sock.updateBlockStatus(jid, 'block');
+      }
+
+      await this.sendSafeMessage(chatId, [
+        `🚫 *Utilisateur(s) bloqué(s)!*`,
+        ``,
+        `• Total: ${mentionedJids.length}`,
+        ``,
+        `🌊 _Water Hashira_`
+      ].join('\n'), { mentions: mentionedJids });
+
+      log.info(`Blocked ${mentionedJids.length} user(s)`);
+    } catch (error) {
+      log.error('Block error:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors du blocage: ${error.message}`);
+    }
+  }
+
+  async cmdUnblock(chatId, message, args) {
+    try {
+      const mentionedJids = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+      
+      if (mentionedJids.length === 0) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucun utilisateur mentionné!*`,
+          ``,
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}unblock @user\``
+        ].join('\n'));
+        return;
+      }
+
+      for (const jid of mentionedJids) {
+        await this.sock.updateBlockStatus(jid, 'unblock');
+      }
+
+      await this.sendSafeMessage(chatId, [
+        `✅ *Utilisateur(s) débloqué(s)!*`,
+        ``,
+        `• Total: ${mentionedJids.length}`,
+        ``,
+        `🌊 _Water Hashira_`
+      ].join('\n'), { mentions: mentionedJids });
+
+      log.info(`Unblocked ${mentionedJids.length} user(s)`);
+    } catch (error) {
+      log.error('Unblock error:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors du déblocage: ${error.message}`);
+    }
+  }
+
+  async cmdJoin(chatId, message, args) {
+    try {
+      if (args.length === 0) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucun lien fourni!*`,
+          ``,
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}join <lien d'invitation>\``,
+          ``,
+          `*Exemple:*`,
+          `\`${CONFIG.prefix}join https://chat.whatsapp.com/XXXXX\``
+        ].join('\n'));
+        return;
+      }
+
+      const inviteLink = args[0];
+      const inviteCode = inviteLink.split('/').pop();
+
+      await this.sock.groupAcceptInvite(inviteCode);
+
+      await this.sendSafeMessage(chatId, [
+        `✅ *Groupe rejoint avec succès!*`,
+        ``,
+        `🔗 Lien: ${inviteLink}`,
+        ``,
+        `🌊 _Water Hashira_`
+      ].join('\n'));
+
+      log.info(`Joined group via invite: ${inviteCode}`);
+    } catch (error) {
+      log.error('Join error:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors de la tentative de rejoindre: ${error.message}`);
+    }
+  }
+
+  async cmdLeave(chatId, message) {
+    try {
+      await this.sendSafeMessage(chatId, [
+        `👋 *Au revoir!*`,
+        ``,
+        `Le bot quitte ce groupe sur demande du propriétaire.`,
+        ``,
+        `Merci d'avoir utilisé AbyssFlow Bot!`,
+        ``,
+        `🌊 _Water Hashira_`
+      ].join('\n'));
+
+      await sleep(2000);
+      await this.sock.groupLeave(chatId);
+
+      log.info(`Left group: ${chatId}`);
+    } catch (error) {
+      log.error('Leave error:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors de la tentative de quitter: ${error.message}`);
+    }
   }
 }
 
