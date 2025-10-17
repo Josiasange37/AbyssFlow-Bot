@@ -875,6 +875,12 @@ class AbyssFlow {
         }
         break;
       
+      case 'viewonce':
+      case 'antiviewonce':
+      case 'revealvo':
+        await this.cmdViewOnce(chatId, message);
+        break;
+      
       default:
         if (isOwner) {
           await this.sendSafeMessage(chatId, `unknown command: ${cmd}\n\nType *help for available commands`, { quotedMessage: message });
@@ -978,7 +984,14 @@ class AbyssFlow {
       `*${prefix}groupinfo* - Infos du groupe`,
       `  • Photo, description, admins`,
       `  • Rappel de contacter les admins`,
-      `  • \`${prefix}infogroup\` - Alias`
+      `  • \`${prefix}infogroup\` - Alias`,
+      '',
+      `*${prefix}viewonce* - Extraire vue unique 👁️`,
+      `  • Répondez à une vue unique avec cette commande`,
+      `  • Renvoie l'image/vidéo en vue normale`,
+      `  • \`${prefix}antiviewonce\` - Alias`,
+      `  • \`${prefix}revealvo\` - Alias`,
+      `  ⚠️ Tous les utilisateurs`
     ];
 
     // Owner-only commands
@@ -2773,6 +2786,140 @@ class AbyssFlow {
       await this.sendSafeMessage(groupId, `❌ Erreur lors de la récupération des infos: ${error.message}`, {
         quotedMessage: message
       });
+    }
+  }
+
+  async cmdViewOnce(chatId, message) {
+    try {
+      // Check if message is a reply to a view once message
+      const quotedMessage = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+      
+      if (!quotedMessage) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucun message "Vue unique" détecté!*`,
+          '',
+          `*💡 Utilisation:*`,
+          `1. Répondez à un message "Vue unique"`,
+          `2. Tapez \`${CONFIG.prefix}viewonce\``,
+          '',
+          `*Exemples:*`,
+          `• \`${CONFIG.prefix}viewonce\` - Extraire le média`,
+          `• \`${CONFIG.prefix}antiviewonce\` - Alias`,
+          `• \`${CONFIG.prefix}revealvo\` - Alias`,
+          '',
+          `⚠️ *Note:* Le message doit être une vue unique (image/vidéo)`,
+          '',
+          `🌊 _Water Hashira - Anti Vue Unique_`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
+      // Check if it's a view once message
+      const viewOnceMessage = quotedMessage.viewOnceMessage || quotedMessage.viewOnceMessageV2 || quotedMessage.viewOnceMessageV2Extension;
+      
+      if (!viewOnceMessage) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Ce n'est pas un message "Vue unique"!*`,
+          '',
+          `Le message cité doit être une photo ou vidéo en vue unique.`,
+          '',
+          `🌊 _Water Hashira_`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
+      log.info(`View once message detected in ${chatId}`);
+
+      // Extract the actual message from view once wrapper
+      const actualMessage = viewOnceMessage.message;
+      
+      if (!actualMessage) {
+        await this.sendSafeMessage(chatId, '❌ Impossible d\'extraire le contenu du message vue unique.', { quotedMessage: message });
+        return;
+      }
+
+      // Get sender info
+      const sender = message.message?.extendedTextMessage?.contextInfo?.participant || 'Inconnu';
+      const senderName = `@${sender.split('@')[0]}`;
+
+      // Send the media as normal (not view once)
+      if (actualMessage.imageMessage) {
+        log.info('Extracting view once image');
+        await this.sock.sendMessage(chatId, {
+          image: actualMessage.imageMessage.url ? { url: actualMessage.imageMessage.url } : actualMessage.imageMessage,
+          caption: [
+            `📸 *Image Vue Unique Extraite*`,
+            '',
+            `👤 *Envoyé par:* ${senderName}`,
+            '',
+            actualMessage.imageMessage.caption ? `📝 *Légende:* ${actualMessage.imageMessage.caption}` : '',
+            '',
+            `🌊 _Extrait par le Water Hashira - Anti Vue Unique_`
+          ].filter(line => line !== '').join('\n'),
+          mentions: [sender]
+        });
+        log.info('View once image extracted successfully');
+      } 
+      else if (actualMessage.videoMessage) {
+        log.info('Extracting view once video');
+        await this.sock.sendMessage(chatId, {
+          video: actualMessage.videoMessage.url ? { url: actualMessage.videoMessage.url } : actualMessage.videoMessage,
+          caption: [
+            `🎥 *Vidéo Vue Unique Extraite*`,
+            '',
+            `👤 *Envoyé par:* ${senderName}`,
+            '',
+            actualMessage.videoMessage.caption ? `📝 *Légende:* ${actualMessage.videoMessage.caption}` : '',
+            '',
+            `🌊 _Extrait par le Water Hashira - Anti Vue Unique_`
+          ].filter(line => line !== '').join('\n'),
+          mentions: [sender]
+        });
+        log.info('View once video extracted successfully');
+      }
+      else if (actualMessage.audioMessage) {
+        log.info('Extracting view once audio');
+        await this.sock.sendMessage(chatId, {
+          audio: actualMessage.audioMessage.url ? { url: actualMessage.audioMessage.url } : actualMessage.audioMessage,
+          mimetype: actualMessage.audioMessage.mimetype,
+          ptt: actualMessage.audioMessage.ptt || false
+        });
+        await this.sendSafeMessage(chatId, [
+          `🎵 *Audio Vue Unique Extrait*`,
+          '',
+          `👤 *Envoyé par:* ${senderName}`,
+          '',
+          `🌊 _Extrait par le Water Hashira - Anti Vue Unique_`
+        ].join('\n'), { mentions: [sender] });
+        log.info('View once audio extracted successfully');
+      }
+      else {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Type de média non supporté*`,
+          '',
+          `Le bot supporte uniquement:`,
+          `• Images 📸`,
+          `• Vidéos 🎥`,
+          `• Audio 🎵`,
+          '',
+          `🌊 _Water Hashira_`
+        ].join('\n'), { quotedMessage: message });
+      }
+
+    } catch (error) {
+      log.error('Failed to extract view once message:', error.message, error.stack);
+      await this.sendSafeMessage(chatId, [
+        `❌ *Erreur lors de l'extraction*`,
+        '',
+        `Impossible d'extraire le média vue unique.`,
+        ``,
+        `Raisons possibles:`,
+        `• Le média a expiré`,
+        `• Le message n'est pas une vue unique`,
+        `• Erreur de connexion`,
+        '',
+        `🌊 _Water Hashira_`
+      ].join('\n'), { quotedMessage: message });
     }
   }
 
