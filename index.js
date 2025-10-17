@@ -1633,6 +1633,18 @@ class AbyssFlow {
     }
   }
 
+  async isBotGroupAdmin(groupId) {
+    try {
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      const botJid = this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
+      const botParticipant = groupMetadata.participants.find(p => p.id === botJid);
+      return botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
+    } catch (error) {
+      log.error('Failed to check bot admin status:', error.message);
+      return false;
+    }
+  }
+
   async cmdWelcome(groupId, args) {
     const settings = this.getGroupSettings(groupId);
     const subCmd = args[0]?.toLowerCase();
@@ -1988,6 +2000,19 @@ class AbyssFlow {
         return;
       }
 
+      // Check if bot is admin
+      const isBotAdmin = await this.isBotGroupAdmin(groupId);
+      if (!isBotAdmin) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Impossible de promouvoir!*`,
+          '',
+          `⚠️ Le bot doit être admin du groupe pour promouvoir des membres.`,
+          '',
+          `💡 *Solution:* Promouvoir le bot en admin du groupe`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
       // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
 
@@ -2071,6 +2096,19 @@ class AbyssFlow {
           `⚠️ *Note:* Mentionnez les admins à révoquer`,
           `⚠️ *Attention:* Peut révoquer même le créateur du groupe!`
         ].join('\n'));
+        return;
+      }
+
+      // Check if bot is admin
+      const isBotAdmin = await this.isBotGroupAdmin(groupId);
+      if (!isBotAdmin) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Impossible de révoquer!*`,
+          '',
+          `⚠️ Le bot doit être admin du groupe pour révoquer des admins.`,
+          '',
+          `💡 *Solution:* Promouvoir le bot en admin du groupe`
+        ].join('\n'), { quotedMessage: message });
         return;
       }
 
@@ -2160,15 +2198,8 @@ class AbyssFlow {
 
   async cmdOpenGroup(groupId, message) {
     try {
-      // Get group metadata
-      const groupMetadata = await this.sock.groupMetadata(groupId);
-      const groupName = groupMetadata.subject || 'Groupe';
-      
       // Check if bot is admin
-      const botJid = this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
-      const botParticipant = groupMetadata.participants.find(p => p.id === botJid);
-      const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
-      
+      const isBotAdmin = await this.isBotGroupAdmin(groupId);
       if (!isBotAdmin) {
         await this.sendSafeMessage(groupId, [
           `❌ *Impossible d'ouvrir le groupe!*`,
@@ -2179,6 +2210,10 @@ class AbyssFlow {
         ].join('\n'), { quotedMessage: message });
         return;
       }
+
+      // Get group metadata
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      const groupName = groupMetadata.subject || 'Groupe';
 
       // Change group settings to allow all participants to send messages
       await this.sock.groupSettingUpdate(groupId, 'not_announcement');
@@ -2220,15 +2255,8 @@ class AbyssFlow {
 
   async cmdCloseGroup(groupId, message) {
     try {
-      // Get group metadata
-      const groupMetadata = await this.sock.groupMetadata(groupId);
-      const groupName = groupMetadata.subject || 'Groupe';
-      
       // Check if bot is admin
-      const botJid = this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
-      const botParticipant = groupMetadata.participants.find(p => p.id === botJid);
-      const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
-      
+      const isBotAdmin = await this.isBotGroupAdmin(groupId);
       if (!isBotAdmin) {
         await this.sendSafeMessage(groupId, [
           `❌ *Impossible de fermer le groupe!*`,
@@ -2239,6 +2267,10 @@ class AbyssFlow {
         ].join('\n'), { quotedMessage: message });
         return;
       }
+
+      // Get group metadata
+      const groupMetadata = await this.sock.groupMetadata(groupId);
+      const groupName = groupMetadata.subject || 'Groupe';
 
       // Change group settings to only allow admins to send messages
       await this.sock.groupSettingUpdate(groupId, 'announcement');
