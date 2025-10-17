@@ -185,6 +185,9 @@ class AbyssFlow {
         goodbye: {
           enabled: false,
           message: '👋 @user a quitté le groupe.\n\n🌊 Que ton chemin soit paisible comme l\'eau calme.'
+        },
+        antibot: {
+          enabled: false
         }
       };
       this.saveGroupSettings();
@@ -315,14 +318,82 @@ class AbyssFlow {
       const settings = this.getGroupSettings(groupId);
 
       for (const participant of participants) {
-        if (action === 'add' && settings.welcome.enabled) {
-          await this.sendWelcomeMessage(groupId, participant, settings.welcome.message);
+        // Check for antibot when someone is added
+        if (action === 'add') {
+          // Check if antibot is enabled
+          if (settings.antibot?.enabled) {
+            await this.checkAndRemoveBot(groupId, participant);
+          }
+          
+          // Send welcome message if enabled
+          if (settings.welcome.enabled) {
+            await this.sendWelcomeMessage(groupId, participant, settings.welcome.message);
+          }
         } else if ((action === 'remove' || action === 'leave') && settings.goodbye.enabled) {
           await this.sendGoodbyeMessage(groupId, participant, settings.goodbye.message);
         }
       }
     } catch (error) {
       log.error('Group participants update error:', error.message);
+    }
+  }
+
+  async checkAndRemoveBot(groupId, participantJid) {
+    try {
+      // Skip if it's our own bot
+      const ourBotJid = this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
+      if (participantJid === ourBotJid) return;
+
+      // Check if the participant is a bot (ends with @lid or is a business account with bot indicators)
+      const isBot = participantJid.includes('@lid') || 
+                    participantJid.includes('bot') ||
+                    participantJid.includes('Bot');
+
+      if (isBot) {
+        log.info(`Bot detected: ${participantJid} in ${groupId}`);
+        
+        // Try to remove the bot
+        try {
+          await this.sock.groupParticipantsUpdate(groupId, [participantJid], 'remove');
+          
+          await this.sock.sendMessage(groupId, {
+            text: [
+              `🤖 *Bot Détecté et Expulsé!*`,
+              '',
+              `🚫 *Bot:* @${participantJid.split('@')[0]}`,
+              '',
+              `⚠️ Ce groupe a l'anti-bot activé.`,
+              `Seul ${CONFIG.botName || 'AbyssFlow'} est autorisé.`,
+              '',
+              `🌊 _Protection par le Water Hashira_`
+            ].join('\n'),
+            mentions: [participantJid]
+          });
+          
+          log.info(`Bot ${participantJid} removed from ${groupId}`);
+        } catch (removeError) {
+          log.error(`Failed to remove bot ${participantJid}:`, removeError.message);
+          
+          // Notify admins if bot couldn't be removed
+          await this.sock.sendMessage(groupId, {
+            text: [
+              `⚠️ *Bot Détecté!*`,
+              '',
+              `🤖 *Bot:* @${participantJid.split('@')[0]}`,
+              '',
+              `❌ Impossible de l'expulser automatiquement.`,
+              `Le bot doit être admin pour expulser.`,
+              '',
+              `💡 *Solution:* Promouvoir le bot en admin ou expulser manuellement.`,
+              '',
+              `🌊 _Water Hashira_`
+            ].join('\n'),
+            mentions: [participantJid]
+          });
+        }
+      }
+    } catch (error) {
+      log.error('Error checking for bot:', error.message);
     }
   }
 
@@ -893,6 +964,18 @@ class AbyssFlow {
         await this.cmdToImage(chatId, message);
         break;
       
+      case 'antibot':
+      case 'antibots':
+      case 'nobot':
+        if (!isGroup) {
+          await this.sendSafeMessage(chatId, '❌ Cette commande fonctionne uniquement dans les groupes!', { quotedMessage: message });
+        } else if (!canUseAdminCommands) {
+          await this.sendSafeMessage(chatId, '❌ Seuls le créateur et les admins peuvent utiliser cette commande!', { quotedMessage: message });
+        } else {
+          await this.cmdAntiBot(chatId, message, args);
+        }
+        break;
+      
       default:
         if (isOwner) {
           await this.sendSafeMessage(chatId, `unknown command: ${cmd}\n\nType *help for available commands`, { quotedMessage: message });
@@ -1015,7 +1098,13 @@ class AbyssFlow {
       `  • Envoyez un sticker avec \`${prefix}toimage\``,
       `  • Ou répondez à un sticker`,
       `  • \`${prefix}toimg\` - Alias`,
-      `  ⚠️ Tous les utilisateurs`
+      `  ⚠️ Tous les utilisateurs`,
+      '',
+      `*${prefix}antibot* - Protection Anti-Bot 🤖`,
+      `  • \`${prefix}antibot on\` - Activer`,
+      `  • \`${prefix}antibot off\` - Désactiver`,
+      `  • Expulse automatiquement les autres bots`,
+      `  ⚠️ Seuls admins et owners`
     ];
 
     // Owner-only commands
@@ -2943,6 +3032,90 @@ class AbyssFlow {
         `• Erreur de connexion`,
         '',
         `🌊 _Water Hashira_`
+      ].join('\n'), { quotedMessage: message });
+    }
+  }
+
+  async cmdAntiBot(groupId, message, args) {
+    const settings = this.getGroupSettings(groupId);
+    const subCmd = args[0]?.toLowerCase();
+
+    if (!subCmd || subCmd === 'status') {
+      // Show current status
+      const status = settings.antibot?.enabled ? '✅ Activé' : '❌ Désactivé';
+      const statusMessage = [
+        `*🤖 Configuration Anti-Bot*`,
+        '',
+        `📊 *Statut actuel:* ${status}`,
+        '',
+        `*💡 Commandes disponibles:*`,
+        `• \`${CONFIG.prefix}antibot on\` - Activer`,
+        `• \`${CONFIG.prefix}antibot off\` - Désactiver`,
+        `• \`${CONFIG.prefix}antibot status\` - Voir le statut`,
+        '',
+        `*🛡️ Fonctionnement:*`,
+        `Quand activé, le bot expulse automatiquement`,
+        `tout autre bot ajouté au groupe.`,
+        '',
+        `⚠️ *Note:* Le bot doit être admin pour expulser`,
+        '',
+        `🌊 _Water Hashira - Protection Anti-Bot_`
+      ].join('\n');
+
+      await this.sendSafeMessage(groupId, statusMessage, { quotedMessage: message });
+      return;
+    }
+
+    if (subCmd === 'on' || subCmd === 'enable' || subCmd === 'activer') {
+      settings.antibot.enabled = true;
+      this.saveGroupSettings();
+
+      await this.sock.sendMessage(groupId, {
+        text: [
+          `✅ *Anti-Bot Activé!*`,
+          '',
+          `🤖 Le bot expulsera automatiquement`,
+          `tout autre bot ajouté au groupe.`,
+          '',
+          `🛡️ *Protection active*`,
+          `Seul ${CONFIG.botName || 'AbyssFlow'} est autorisé.`,
+          '',
+          `⚠️ *Important:* Le bot doit être admin`,
+          `pour pouvoir expulser les autres bots.`,
+          '',
+          `🌊 _Water Hashira - Protection Activée_`
+        ].join('\n'),
+        quoted: message
+      });
+
+      log.info(`Anti-bot enabled in ${groupId}`);
+    } else if (subCmd === 'off' || subCmd === 'disable' || subCmd === 'desactiver') {
+      settings.antibot.enabled = false;
+      this.saveGroupSettings();
+
+      await this.sock.sendMessage(groupId, {
+        text: [
+          `❌ *Anti-Bot Désactivé*`,
+          '',
+          `🤖 Les autres bots peuvent maintenant`,
+          `être ajoutés au groupe.`,
+          '',
+          `💡 Pour réactiver: \`${CONFIG.prefix}antibot on\``,
+          '',
+          `🌊 _Water Hashira_`
+        ].join('\n'),
+        quoted: message
+      });
+
+      log.info(`Anti-bot disabled in ${groupId}`);
+    } else {
+      await this.sendSafeMessage(groupId, [
+        `❌ *Commande invalide!*`,
+        '',
+        `*💡 Utilisation:*`,
+        `• \`${CONFIG.prefix}antibot on\` - Activer`,
+        `• \`${CONFIG.prefix}antibot off\` - Désactiver`,
+        `• \`${CONFIG.prefix}antibot status\` - Voir le statut`
       ].join('\n'), { quotedMessage: message });
     }
   }
