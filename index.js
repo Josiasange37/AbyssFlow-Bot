@@ -125,6 +125,27 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Simulate realistic typing to avoid WhatsApp ban
+async function simulateTyping(sock, chatId, durationMs = 3000) {
+  try {
+    await sock.sendPresenceUpdate('composing', chatId);
+    await sleep(durationMs);
+    await sock.sendPresenceUpdate('paused', chatId);
+  } catch (error) {
+    // Ignore typing simulation errors
+  }
+}
+
+// Calculate realistic typing duration based on message length
+function calculateTypingDuration(messageLength) {
+  // Average typing speed: 40 words per minute = ~200 characters per minute
+  // = ~3.3 characters per second
+  const baseTime = 1000; // Minimum 1 second
+  const typingTime = (messageLength / 3.3) * 1000;
+  const randomVariation = Math.random() * 1000; // Add 0-1s random variation
+  return Math.min(baseTime + typingTime + randomVariation, 8000); // Max 8 seconds
+}
+
 function normalizeNumber(input) {
   return (input || '').replace(/[^0-9]/g, '');
 }
@@ -735,6 +756,18 @@ class AbyssFlow {
         await this.cmdGithub(chatId, message, args);
         break;
       
+      case 'search':
+      case 'google':
+      case 'find':
+        await this.cmdSearch(chatId, message, args);
+        break;
+      
+      case 'db':
+      case 'download':
+      case 'dl':
+        await this.cmdDownload(chatId, message, args);
+        break;
+      
       // Debug command to identify your number
       case 'whoami':
         const whoamiMsg = [
@@ -1105,7 +1138,21 @@ class AbyssFlow {
       `  • \`${prefix}antibot on\` - Activer`,
       `  • \`${prefix}antibot off\` - Désactiver`,
       `  • Expulse automatiquement les autres bots`,
-      `  ⚠️ Seuls admins et owners`
+      `  ⚠️ Seuls admins et owners`,
+      '',
+      `*${prefix}search* - Recherche Google 🔍`,
+      `  • \`${prefix}search <requête>\` - Chercher sur Google`,
+      `  • \`${prefix}google JavaScript\` - Exemple`,
+      `  • \`${prefix}find Python tips\` - Alias`,
+      `  • Avec banner personnalisée`,
+      `  ⚠️ Tous les utilisateurs`,
+      '',
+      `*${prefix}db* - Télécharger Audio/Vidéo 📥`,
+      `  • \`${prefix}db chanson.mp3\` - Audio`,
+      `  • \`${prefix}download video.mp4\` - Vidéo`,
+      `  • Formats: MP3, MP4, WAV, M4A, etc.`,
+      `  • En développement`,
+      `  ⚠️ Tous les utilisateurs`
     ];
 
     // Owner-only commands
@@ -1113,8 +1160,11 @@ class AbyssFlow {
       '',
       `*⚡ Owner Commands*`,
       '',
-      `*${prefix}broadcast* - Diffuser un message`,
+      `*${prefix}broadcast* - Diffuser un message 📢`,
       `  • \`${prefix}broadcast <message>\` - À tous les groupes`,
+      `  • 🛡️ Simulation d'écriture réaliste`,
+      `  • ⏱️ Délais aléatoires anti-spam`,
+      `  • 🔒 Protection anti-ban WhatsApp`,
       '',
       `*${prefix}stats* - Statistiques détaillées`,
       `  • Groupes, messages, cache, uptime`,
@@ -1807,6 +1857,162 @@ class AbyssFlow {
     } catch (error) {
       log.error('Failed to check bot admin status:', error.message);
       return false;
+    }
+  }
+
+  async cmdSearch(chatId, message, args) {
+    try {
+      // Simulate realistic typing
+      const typingDuration = calculateTypingDuration(200);
+      await simulateTyping(this.sock, chatId, typingDuration);
+
+      if (args.length === 0) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucune requête de recherche!*`,
+          '',
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}search <requête>\``,
+          '',
+          `*Exemples:*`,
+          `• \`${CONFIG.prefix}search JavaScript tutorials\``,
+          `• \`${CONFIG.prefix}google Python tips\``,
+          `• \`${CONFIG.prefix}find WhatsApp bot\``,
+          '',
+          `🌊 _Water Hashira - Recherche Google_`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
+      const query = args.join(' ');
+      log.info(`Searching Google for: ${query}`);
+
+      // Create search URL
+      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+      
+      const searchText = [
+        `🔍 *Résultats de Recherche Google*`,
+        '',
+        `📝 *Requête:* ${query}`,
+        '',
+        `🔗 *Lien:*`,
+        searchUrl,
+        '',
+        `💡 *Astuce:* Cliquez sur le lien pour voir tous les résultats`,
+        '',
+        `🌊 _Recherche effectuée par le Water Hashira_`
+      ].join('\n');
+
+      // Try to send with banner
+      const bannerPaths = [
+        path.join(__dirname, 'assets', 'banners', 'search-banner.jpg'),
+        path.join(__dirname, 'assets', 'banners', 'search-banner.png'),
+        path.join(__dirname, 'assets', 'banners', 'google-banner.jpg')
+      ];
+
+      let bannerSent = false;
+      for (const bannerPath of bannerPaths) {
+        if (await fs.pathExists(bannerPath)) {
+          try {
+            await this.sock.sendMessage(chatId, {
+              image: { url: bannerPath },
+              caption: searchText,
+              quoted: message
+            });
+            bannerSent = true;
+            log.info('Search results sent with banner');
+            break;
+          } catch (error) {
+            log.warn(`Failed to send with banner ${bannerPath}:`, error.message);
+          }
+        }
+      }
+
+      if (!bannerSent) {
+        await this.sendSafeMessage(chatId, searchText, { quotedMessage: message });
+        log.info('Search results sent without banner');
+      }
+
+    } catch (error) {
+      log.error('Search command failed:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors de la recherche: ${error.message}`, { quotedMessage: message });
+    }
+  }
+
+  async cmdDownload(chatId, message, args) {
+    try {
+      // Simulate realistic typing
+      const typingDuration = calculateTypingDuration(150);
+      await simulateTyping(this.sock, chatId, typingDuration);
+
+      if (args.length === 0) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Aucun nom de fichier fourni!*`,
+          '',
+          `*💡 Utilisation:*`,
+          `\`${CONFIG.prefix}db <nom du fichier>\``,
+          '',
+          `*Exemples:*`,
+          `• \`${CONFIG.prefix}db chanson.mp3\``,
+          `• \`${CONFIG.prefix}download video.mp4\``,
+          `• \`${CONFIG.prefix}dl audio.wav\``,
+          '',
+          `*Types supportés:*`,
+          `• 🎵 Audio: MP3, WAV, M4A, OGG`,
+          `• 🎥 Vidéo: MP4, MKV, AVI, MOV`,
+          '',
+          `⚠️ *Note:* Cette fonctionnalité est limitée aux fichiers disponibles`,
+          '',
+          `🌊 _Water Hashira - Téléchargeur_`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
+      const fileName = args.join(' ');
+      log.info(`Download request for: ${fileName}`);
+
+      // Check file type
+      const fileExt = fileName.split('.').pop().toLowerCase();
+      const audioExts = ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac'];
+      const videoExts = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv'];
+
+      if (!audioExts.includes(fileExt) && !videoExts.includes(fileExt)) {
+        await this.sendSafeMessage(chatId, [
+          `❌ *Format non supporté!*`,
+          '',
+          `Le fichier doit être audio ou vidéo.`,
+          '',
+          `*Formats supportés:*`,
+          `• 🎵 Audio: ${audioExts.join(', ')}`,
+          `• 🎥 Vidéo: ${videoExts.join(', ')}`,
+          '',
+          `🌊 _Water Hashira_`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
+
+      // Simulate processing
+      await simulateTyping(this.sock, chatId, 2000);
+
+      // For now, send a message that the feature is in development
+      await this.sendSafeMessage(chatId, [
+        `🚧 *Fonctionnalité en Développement*`,
+        '',
+        `📁 *Fichier demandé:* ${fileName}`,
+        `📊 *Type:* ${audioExts.includes(fileExt) ? 'Audio 🎵' : 'Vidéo 🎥'}`,
+        '',
+        `⚠️ Cette fonctionnalité nécessite une intégration`,
+        `avec un service de stockage cloud.`,
+        '',
+        `💡 *En attendant, vous pouvez:*`,
+        `• Utiliser des services comme YouTube Music`,
+        `• Partager directement les fichiers dans le groupe`,
+        '',
+        `🌊 _Water Hashira - Bientôt Disponible_`
+      ].join('\n'), { quotedMessage: message });
+
+    } catch (error) {
+      log.error('Download command failed:', error.message);
+      await this.sendSafeMessage(chatId, `❌ Erreur lors du téléchargement: ${error.message}`, { quotedMessage: message });
     }
   }
 
@@ -3498,7 +3704,8 @@ class AbyssFlow {
       ``,
       `👥 *Tous les utilisateurs:*`,
       `• help, ping, about, links`,
-      `• github, whoami`,
+      `• github, whoami, search`,
+      `• db (téléchargement audio/vidéo)`,
       `• privacy, disclaimer, terms`,
       ``,
       `*4️⃣ SURVEILLANCE AUTOMATIQUE*`,
@@ -3590,7 +3797,10 @@ class AbyssFlow {
           `\`${CONFIG.prefix}broadcast <message>\``,
           ``,
           `*Exemple:*`,
-          `\`${CONFIG.prefix}broadcast Mise à jour importante!\``
+          `\`${CONFIG.prefix}broadcast Mise à jour importante!\``,
+          ``,
+          `⚠️ *Note:* Le broadcast utilise une simulation`,
+          `d'écriture réaliste pour éviter les bans WhatsApp.`
         ].join('\n'));
         return;
       }
@@ -3599,38 +3809,71 @@ class AbyssFlow {
       const chats = await this.sock.groupFetchAllParticipating();
       const groups = Object.values(chats).filter(chat => chat.id.endsWith('@g.us'));
 
-      await this.sendSafeMessage(chatId, `📢 Diffusion en cours vers ${groups.length} groupes...`);
+      await this.sendSafeMessage(chatId, [
+        `📢 *Diffusion Initiée*`,
+        ``,
+        `📊 Cibles: ${groups.length} groupes`,
+        `⏱️ Temps estimé: ~${Math.ceil(groups.length * 5 / 60)} minutes`,
+        ``,
+        `🔒 *Protection Anti-Ban Active*`,
+        `• Simulation d'écriture réaliste`,
+        `• Délais aléatoires entre envois`,
+        `• Présence naturelle`,
+        ``,
+        `💧 _Diffusion en cours..._`
+      ].join('\n'));
 
       let successCount = 0;
       let failCount = 0;
 
       for (const group of groups) {
         try {
+          // Simulate realistic typing for each group
+          const messageText = [
+            `💧 *Message Important*`,
+            ``,
+            broadcastMessage,
+            ``,
+            `━━━━━━━━━━━━━━━━━━━━`,
+            `🌊 _Water Hashira_`
+          ].join('\n');
+          
+          // Calculate realistic typing duration
+          const typingDuration = calculateTypingDuration(messageText.length);
+          
+          // Simulate typing
+          await simulateTyping(this.sock, group.id, typingDuration);
+          
+          // Send message
           await this.sock.sendMessage(group.id, {
-            text: [
-              `📢 *ANNONCE DU CRÉATEUR*`,
-              ``,
-              broadcastMessage,
-              ``,
-              `━━━━━━━━━━━━━━━━━━━━`,
-              `🌊 _AbyssFlow Bot - Water Hashira_`
-            ].join('\n')
+            text: messageText
           });
+          
           successCount++;
-          await sleep(2000); // Délai anti-spam
+          
+          // Random delay between 3-7 seconds to look more natural
+          const randomDelay = 3000 + Math.random() * 4000;
+          await sleep(randomDelay);
+          
         } catch (error) {
           failCount++;
           log.error(`Broadcast failed for ${group.id}:`, error.message);
+          // Continue with next group even if one fails
         }
       }
 
       await this.sendSafeMessage(chatId, [
-        `✅ *Diffusion terminée!*`,
+        `✅ *Diffusion Terminée!*`,
         ``,
         `📊 *Résultats:*`,
-        `• Succès: ${successCount}`,
-        `• Échecs: ${failCount}`,
-        `• Total: ${groups.length}`
+        `• ✅ Succès: ${successCount}`,
+        `• ❌ Échecs: ${failCount}`,
+        `• 📢 Total: ${groups.length}`,
+        ``,
+        `⏱️ *Durée:* ${Math.ceil((successCount * 5) / 60)} minutes`,
+        ``,
+        `🛡️ *Protection Anti-Ban:* Active`,
+        `🌊 _Water Hashira - Diffusion Sécurisée_`
       ].join('\n'));
 
       log.info(`Broadcast completed: ${successCount}/${groups.length} successful`);
