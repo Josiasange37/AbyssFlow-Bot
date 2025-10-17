@@ -619,22 +619,22 @@ class AbyssFlow {
       `*${prefix}kick* - Expulser des membres`,
       `  • \`${prefix}kick @user\` - Expulser un membre`,
       `  • \`${prefix}remove @user1 @user2\` - Plusieurs membres`,
-      `  ⚠️ Le bot doit être admin`,
+      `  ⚠️ Seuls admins et owners`,
       '',
       `*${prefix}add* - Ajouter des membres`,
       `  • \`${prefix}add 237XXXXXXXXX\` - Ajouter un membre`,
       `  • \`${prefix}invite 237XXX 237YYY\` - Plusieurs membres`,
-      `  ⚠️ Le bot doit être admin`,
+      `  ⚠️ Seuls admins et owners`,
       '',
       `*${prefix}promote* - Promouvoir en admin`,
       `  • \`${prefix}promote @user\` - Promouvoir un membre`,
       `  • \`${prefix}promote @user1 @user2\` - Plusieurs membres`,
-      `  ⚠️ Le bot doit être admin`,
+      `  ⚠️ Seuls admins et owners`,
       '',
       `*${prefix}demote* - Révoquer un admin`,
       `  • \`${prefix}demote @admin\` - Révoquer un admin`,
       `  • \`${prefix}demote @admin1 @admin2\` - Plusieurs admins`,
-      `  ⚠️ Peut révoquer même le créateur du groupe!`,
+      `  ⚠️ Peut révoquer même le créateur!`,
       '',
       `*${prefix}open* - Ouvrir le groupe`,
       `  • \`${prefix}open\` - Tous les membres peuvent écrire`,
@@ -1679,37 +1679,8 @@ class AbyssFlow {
         return;
       }
 
-      // Get group metadata to check bot's admin status
+      // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
-      
-      // Find bot's JID
-      const possibleBotJids = [
-        this.sock.user.id,
-        this.sock.user.id.replace(/:\d+/, '@s.whatsapp.net'),
-        this.sock.user.id.split(':')[0] + '@s.whatsapp.net',
-        this.sock.user.id.split('@')[0] + '@s.whatsapp.net'
-      ];
-      
-      let botParticipant = null;
-      for (const jid of possibleBotJids) {
-        botParticipant = groupMetadata.participants.find(p => p.id === jid);
-        if (botParticipant) break;
-      }
-      
-      // Check if bot is admin
-      if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
-        await this.sendSafeMessage(groupId, [
-          `❌ *Le bot doit être admin du groupe!*`,
-          '',
-          `📊 *Statut actuel:* Membre normal`,
-          '',
-          `💡 *Pour rendre le bot admin:*`,
-          `1. Infos du groupe → Participants`,
-          `2. Trouvez le bot dans la liste`,
-          `3. Appuyez longuement → "Promouvoir en admin"`
-        ].join('\n'));
-        return;
-      }
 
       // Get current admins
       const currentAdmins = groupMetadata.participants
@@ -1794,37 +1765,8 @@ class AbyssFlow {
         return;
       }
 
-      // Get group metadata to check bot's admin status
+      // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
-      
-      // Find bot's JID
-      const possibleBotJids = [
-        this.sock.user.id,
-        this.sock.user.id.replace(/:\d+/, '@s.whatsapp.net'),
-        this.sock.user.id.split(':')[0] + '@s.whatsapp.net',
-        this.sock.user.id.split('@')[0] + '@s.whatsapp.net'
-      ];
-      
-      let botParticipant = null;
-      for (const jid of possibleBotJids) {
-        botParticipant = groupMetadata.participants.find(p => p.id === jid);
-        if (botParticipant) break;
-      }
-      
-      // Check if bot is admin
-      if (!botParticipant || (botParticipant.admin !== 'admin' && botParticipant.admin !== 'superadmin')) {
-        await this.sendSafeMessage(groupId, [
-          `❌ *Le bot doit être admin du groupe!*`,
-          '',
-          `📊 *Statut actuel:* Membre normal`,
-          '',
-          `💡 *Pour rendre le bot admin:*`,
-          `1. Infos du groupe → Participants`,
-          `2. Trouvez le bot dans la liste`,
-          `3. Appuyez longuement → "Promouvoir en admin"`
-        ].join('\n'));
-        return;
-      }
 
       // Get current admins
       const currentAdmins = groupMetadata.participants
