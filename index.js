@@ -2362,24 +2362,12 @@ class AbyssFlow {
 
   async cmdOpenGroup(groupId, message) {
     try {
-      // Check if bot is admin
-      const isBotAdmin = await this.isBotGroupAdmin(groupId);
-      if (!isBotAdmin) {
-        await this.sendSafeMessage(groupId, [
-          `❌ *Impossible d'ouvrir le groupe!*`,
-          '',
-          `⚠️ Le bot doit être admin du groupe pour modifier ces paramètres.`,
-          '',
-          `💡 *Solution:* Promouvoir le bot en admin du groupe`
-        ].join('\n'), { quotedMessage: message });
-        return;
-      }
-
       // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
       const groupName = groupMetadata.subject || 'Groupe';
 
       // Change group settings to allow all participants to send messages
+      // WhatsApp will handle permissions - only group admins can do this
       await this.sock.groupSettingUpdate(groupId, 'not_announcement');
       
       await this.sock.sendMessage(groupId, {
@@ -2419,24 +2407,12 @@ class AbyssFlow {
 
   async cmdCloseGroup(groupId, message) {
     try {
-      // Check if bot is admin
-      const isBotAdmin = await this.isBotGroupAdmin(groupId);
-      if (!isBotAdmin) {
-        await this.sendSafeMessage(groupId, [
-          `❌ *Impossible de fermer le groupe!*`,
-          '',
-          `⚠️ Le bot doit être admin du groupe pour modifier ces paramètres.`,
-          '',
-          `💡 *Solution:* Promouvoir le bot en admin du groupe`
-        ].join('\n'), { quotedMessage: message });
-        return;
-      }
-
       // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
       const groupName = groupMetadata.subject || 'Groupe';
 
       // Change group settings to only allow admins to send messages
+      // WhatsApp will handle permissions - only group admins can do this
       await this.sock.groupSettingUpdate(groupId, 'announcement');
       
       await this.sock.sendMessage(groupId, {
