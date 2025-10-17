@@ -2163,6 +2163,22 @@ class AbyssFlow {
       // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
       const groupName = groupMetadata.subject || 'Groupe';
+      
+      // Check if bot is admin
+      const botJid = this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
+      const botParticipant = groupMetadata.participants.find(p => p.id === botJid);
+      const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
+      
+      if (!isBotAdmin) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Impossible d'ouvrir le groupe!*`,
+          '',
+          `⚠️ Le bot doit être admin du groupe pour modifier ces paramètres.`,
+          '',
+          `💡 *Solution:* Promouvoir le bot en admin du groupe`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
 
       // Change group settings to allow all participants to send messages
       await this.sock.groupSettingUpdate(groupId, 'not_announcement');
@@ -2207,6 +2223,22 @@ class AbyssFlow {
       // Get group metadata
       const groupMetadata = await this.sock.groupMetadata(groupId);
       const groupName = groupMetadata.subject || 'Groupe';
+      
+      // Check if bot is admin
+      const botJid = this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
+      const botParticipant = groupMetadata.participants.find(p => p.id === botJid);
+      const isBotAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
+      
+      if (!isBotAdmin) {
+        await this.sendSafeMessage(groupId, [
+          `❌ *Impossible de fermer le groupe!*`,
+          '',
+          `⚠️ Le bot doit être admin du groupe pour modifier ces paramètres.`,
+          '',
+          `💡 *Solution:* Promouvoir le bot en admin du groupe`
+        ].join('\n'), { quotedMessage: message });
+        return;
+      }
 
       // Change group settings to only allow admins to send messages
       await this.sock.groupSettingUpdate(groupId, 'announcement');
