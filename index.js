@@ -2878,14 +2878,30 @@ class AbyssFlow {
         return;
       }
 
-      // Check if it's a view once message
-      const viewOnceMessage = quotedMessage.viewOnceMessage || quotedMessage.viewOnceMessageV2 || quotedMessage.viewOnceMessageV2Extension;
+      // Log quoted message structure for debugging
+      log.info('Quoted message keys:', Object.keys(quotedMessage));
+
+      // Check multiple possible view once message structures
+      let viewOnceMessage = quotedMessage.viewOnceMessage 
+        || quotedMessage.viewOnceMessageV2 
+        || quotedMessage.viewOnceMessageV2Extension;
+      
+      // Check if it's wrapped in ephemeralMessage
+      if (!viewOnceMessage && quotedMessage.ephemeralMessage) {
+        viewOnceMessage = quotedMessage.ephemeralMessage.message?.viewOnceMessage 
+          || quotedMessage.ephemeralMessage.message?.viewOnceMessageV2
+          || quotedMessage.ephemeralMessage.message?.viewOnceMessageV2Extension;
+      }
       
       if (!viewOnceMessage) {
+        // Debug: Show what we got
+        log.warn('Not a view once message. Keys found:', Object.keys(quotedMessage));
         await this.sendSafeMessage(chatId, [
           `❌ *Ce n'est pas un message "Vue unique"!*`,
           '',
           `Le message cité doit être une photo ou vidéo en vue unique.`,
+          '',
+          `🔍 *Debug:* Type de message: ${Object.keys(quotedMessage).join(', ')}`,
           '',
           `🌊 _Water Hashira_`
         ].join('\n'), { quotedMessage: message });
