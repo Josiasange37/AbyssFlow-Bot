@@ -398,14 +398,33 @@ class AbyssFlow {
         const messageId = update.key.id;
         const chatId = update.key.remoteJid;
         
-        // Check if message was deleted (messageStubType 68 = REVOKE)
-        if (update.update?.messageStubType === 68 || update.update?.messageStubType === 'REVOKE') {
+        // Log update for debugging
+        if (LOG_THRESHOLD >= LOG_LEVEL_MAP.debug) {
+          log.debug('Message update received:', JSON.stringify({
+            messageId,
+            chatId,
+            updateKeys: Object.keys(update.update || {}),
+            status: update.update?.status,
+            messageStubType: update.update?.messageStubType
+          }));
+        }
+        
+        // Check if message was deleted
+        // In Baileys, deleted messages have update.update.message = null or status = DELETED
+        if (update.update?.message === null || 
+            update.update?.status === 'DELETED' ||
+            update.update?.messageStubType === 68 ||
+            (update.update && Object.keys(update.update).length === 0)) {
+          
           const cachedMessage = this.messageCache.get(messageId);
           
           if (cachedMessage) {
+            log.info(`Message deletion detected: ${messageId} in ${chatId}`);
             await this.notifyMessageDeletion(chatId, cachedMessage);
             // Keep in cache for a bit in case of multiple delete events
             setTimeout(() => this.messageCache.delete(messageId), 5000);
+          } else {
+            log.debug(`Deleted message not in cache: ${messageId}`);
           }
         }
         // Check if message was edited
@@ -418,6 +437,7 @@ class AbyssFlow {
             
             // Only notify if text actually changed
             if (oldText !== newText) {
+              log.info(`Message edit detected: ${messageId} in ${chatId}`);
               await this.notifyMessageEdit(chatId, cachedMessage.sender, oldText, newText);
               
               // Update cache
@@ -494,44 +514,62 @@ class AbyssFlow {
     try {
       const msg = cachedMessage.message;
       let mediaType = 'Media';
-      let mediaMessage = null;
       
+      log.info(`Attempting to resend deleted media in ${chatId}`);
+      
+      // Try to forward the original message if possible
       if (msg.imageMessage) {
         mediaType = 'Image';
-        mediaMessage = { image: { url: await this.downloadMedia(msg.imageMessage) }, caption: `🗑️ *Image Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_` };
+        await this.sock.sendMessage(chatId, {
+          image: msg.imageMessage.url ? { url: msg.imageMessage.url } : msg.imageMessage,
+          caption: `🗑️ *Image Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_`,
+          mentions: [cachedMessage.sender]
+        });
       } else if (msg.videoMessage) {
         mediaType = 'Vidéo';
-        mediaMessage = { video: { url: await this.downloadMedia(msg.videoMessage) }, caption: `🗑️ *Vidéo Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_` };
+        await this.sock.sendMessage(chatId, {
+          video: msg.videoMessage.url ? { url: msg.videoMessage.url } : msg.videoMessage,
+          caption: `🗑️ *Vidéo Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_`,
+          mentions: [cachedMessage.sender]
+        });
       } else if (msg.stickerMessage) {
         mediaType = 'Sticker';
-        mediaMessage = { sticker: { url: await this.downloadMedia(msg.stickerMessage) } };
-        // Send text separately for stickers
+        await this.sock.sendMessage(chatId, {
+          sticker: msg.stickerMessage.url ? { url: msg.stickerMessage.url } : msg.stickerMessage
+        });
         await this.sock.sendMessage(chatId, {
           text: `🗑️ *Sticker Supprimé*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupéré par le Water Hashira_`,
           mentions: [cachedMessage.sender]
         });
       } else if (msg.audioMessage) {
         mediaType = 'Audio';
-        mediaMessage = { audio: { url: await this.downloadMedia(msg.audioMessage) }, mimetype: msg.audioMessage.mimetype };
+        await this.sock.sendMessage(chatId, {
+          audio: msg.audioMessage.url ? { url: msg.audioMessage.url } : msg.audioMessage,
+          mimetype: msg.audioMessage.mimetype,
+          mentions: [cachedMessage.sender]
+        });
       } else if (msg.documentMessage) {
         mediaType = 'Document';
-        mediaMessage = { document: { url: await this.downloadMedia(msg.documentMessage) }, mimetype: msg.documentMessage.mimetype, fileName: msg.documentMessage.fileName };
+        await this.sock.sendMessage(chatId, {
+          document: msg.documentMessage.url ? { url: msg.documentMessage.url } : msg.documentMessage,
+          mimetype: msg.documentMessage.mimetype,
+          fileName: msg.documentMessage.fileName || 'document',
+          mentions: [cachedMessage.sender]
+        });
       }
       
-      if (mediaMessage) {
-        if (!msg.stickerMessage) {
-          mediaMessage.mentions = [cachedMessage.sender];
-        }
-        await this.sock.sendMessage(chatId, mediaMessage);
-        log.info(`Resent deleted ${mediaType} in ${chatId}`);
-      }
+      log.info(`Successfully resent deleted ${mediaType} in ${chatId}`);
     } catch (error) {
-      log.error('Failed to resend deleted media:', error.message);
+      log.error('Failed to resend deleted media:', error.message, error.stack);
       // Fallback to text notification
-      await this.sock.sendMessage(chatId, {
-        text: `🗑️ *Media Supprimé*\n\n👤 *Par:* ${senderName}\n\n⚠️ Impossible de récupérer le media\n\n🌊 _Water Hashira_`,
-        mentions: [cachedMessage.sender]
-      });
+      try {
+        await this.sock.sendMessage(chatId, {
+          text: `🗑️ *Media Supprimé*\n\n👤 *Par:* ${senderName}\n\n⚠️ Le média ne peut plus être récupéré (supprimé du serveur WhatsApp)\n\n🌊 _Water Hashira_`,
+          mentions: [cachedMessage.sender]
+        });
+      } catch (fallbackError) {
+        log.error('Failed to send fallback notification:', fallbackError.message);
+      }
     }
   }
 
