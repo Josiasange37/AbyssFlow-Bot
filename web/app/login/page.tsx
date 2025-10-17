@@ -22,6 +22,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [qrCode, setQrCode] = useState('abyssflow://connect?session=demo123')
+  const [hasPayment, setHasPayment] = useState(false)
+  const [userPlan, setUserPlan] = useState('free')
   
   const [formData, setFormData] = useState({
     email: '',
@@ -29,6 +31,28 @@ export default function LoginPage() {
     phone: '',
     name: '',
     plan: 'free'
+  })
+
+  // Check payment status on mount
+  useState(() => {
+    const checkPayment = async () => {
+      const token = localStorage.getItem('auth-token')
+      if (!token) return
+      
+      try {
+        const response = await fetch('http://localhost:3001/api/payment/status', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        setHasPayment(data.hasPayment)
+        
+        const user = JSON.parse(localStorage.getItem('user') || '{}')
+        setUserPlan(user.plan || 'free')
+      } catch (error) {
+        console.error('Failed to check payment:', error)
+      }
+    }
+    checkPayment()
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,46 +226,85 @@ export default function LoginPage() {
             animate={{ opacity: 1 }}
             className="text-center"
           >
-            <div className="bg-white p-6 rounded-xl inline-block mb-4">
-              <QRCodeSVG 
-                value={qrCode} 
-                size={200}
-                level="H"
-                includeMargin={true}
-              />
-            </div>
-            
-            <h3 className="text-xl font-semibold mb-2">Scanner le QR Code</h3>
-            <p className="text-gray-400 mb-4">
-              Ouvrez WhatsApp sur votre téléphone et scannez ce code
-            </p>
+            {!hasPayment || userPlan === 'free' ? (
+              // Payment Required Message
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8">
+                <div className="w-20 h-20 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Lock className="w-10 h-10 text-red-500" />
+                </div>
+                
+                <h3 className="text-2xl font-bold mb-3 text-red-500">Accès Restreint</h3>
+                <p className="text-gray-300 mb-6">
+                  Le QR Code n'est disponible que pour les utilisateurs avec un plan actif
+                </p>
 
-            <div className="space-y-2 text-sm text-gray-400 text-left bg-dark-800 p-4 rounded-lg mb-4">
-              <p className="font-semibold text-white mb-2">📱 Instructions:</p>
-              <p>1. Ouvrez WhatsApp sur votre téléphone</p>
-              <p>2. Appuyez sur Menu (⋮) ou Paramètres</p>
-              <p>3. Sélectionnez "Appareils liés"</p>
-              <p>4. Appuyez sur "Lier un appareil"</p>
-              <p>5. Scannez ce QR code</p>
-            </div>
+                <div className="bg-dark-800 p-4 rounded-lg mb-6 text-left">
+                  <p className="font-semibold text-white mb-3">🔒 Pour accéder au bot, vous devez:</p>
+                  <div className="space-y-2 text-sm text-gray-400">
+                    <p>✅ Avoir un compte (vous l'avez)</p>
+                    <p>❌ Choisir un plan payant (Gold ou Pro)</p>
+                    <p>❌ Valider votre paiement</p>
+                  </div>
+                </div>
 
-            <button
-              onClick={handleQRConnect}
-              disabled={loading}
-              className="w-full py-3 bg-primary-600 hover:bg-primary-700 rounded-lg font-semibold transition flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Connexion en cours...
-                </>
-              ) : (
-                <>
-                  <QrCode className="w-5 h-5" />
-                  Générer nouveau QR
-                </>
-              )}
-            </button>
+                <div className="space-y-3">
+                  <Link
+                    href="/dashboard/upgrade"
+                    className="block w-full py-3 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 rounded-lg font-semibold transition"
+                  >
+                    Choisir un Plan Payant
+                  </Link>
+                  
+                  <p className="text-xs text-gray-500">
+                    Plans disponibles: Gold ($9.99/mois) ou Pro ($24.99/mois)
+                  </p>
+                </div>
+              </div>
+            ) : (
+              // QR Code Display (only if payment active)
+              <>
+                <div className="bg-white p-6 rounded-xl inline-block mb-4">
+                  <QRCodeSVG 
+                    value={qrCode} 
+                    size={200}
+                    level="H"
+                    includeMargin={true}
+                  />
+                </div>
+                
+                <h3 className="text-xl font-semibold mb-2">Scanner le QR Code</h3>
+                <p className="text-gray-400 mb-4">
+                  Ouvrez WhatsApp sur votre téléphone et scannez ce code
+                </p>
+
+                <div className="space-y-2 text-sm text-gray-400 text-left bg-dark-800 p-4 rounded-lg mb-4">
+                  <p className="font-semibold text-white mb-2">📱 Instructions:</p>
+                  <p>1. Ouvrez WhatsApp sur votre téléphone</p>
+                  <p>2. Appuyez sur Menu (⋮) ou Paramètres</p>
+                  <p>3. Sélectionnez "Appareils liés"</p>
+                  <p>4. Appuyez sur "Lier un appareil"</p>
+                  <p>5. Scannez ce QR code</p>
+                </div>
+
+                <button
+                  onClick={handleQRConnect}
+                  disabled={loading}
+                  className="w-full py-3 bg-primary-600 hover:bg-primary-700 rounded-lg font-semibold transition flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Connexion en cours...
+                    </>
+                  ) : (
+                    <>
+                      <QrCode className="w-5 h-5" />
+                      Générer nouveau QR
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </motion.div>
         )}
 
