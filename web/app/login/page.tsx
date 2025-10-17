@@ -1,0 +1,326 @@
+'use client'
+
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { 
+  Droplets, 
+  Mail, 
+  Lock, 
+  Phone, 
+  QrCode,
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Loader2
+} from 'lucide-react'
+import Link from 'next/link'
+import { QRCodeSVG } from 'qrcode.react'
+
+export default function LoginPage() {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [method, setMethod] = useState<'qr' | 'phone'>('qr')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [qrCode, setQrCode] = useState('abyssflow://connect?session=demo123')
+  
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    phone: '',
+    name: '',
+    plan: 'free'
+  })
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    
+    // Simulate API call
+    setTimeout(() => {
+      setLoading(false)
+      alert(`${mode === 'login' ? 'Connexion' : 'Inscription'} réussie!`)
+    }, 2000)
+  }
+
+  const handleQRConnect = () => {
+    setLoading(true)
+    // Simulate QR code generation
+    setTimeout(() => {
+      setQrCode(`abyssflow://connect?session=${Date.now()}`)
+      setLoading(false)
+    }, 1000)
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+      {/* Background Effects */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse-slow" style={{ animationDelay: '1s' }}></div>
+      </div>
+
+      {/* Back to Home */}
+      <Link 
+        href="/"
+        className="absolute top-8 left-8 flex items-center gap-2 text-gray-400 hover:text-white transition"
+      >
+        <ArrowLeft className="w-5 h-5" />
+        Retour
+      </Link>
+
+      {/* Login/Register Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-dark rounded-2xl p-8 w-full max-w-md relative z-10"
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <Droplets className="w-10 h-10 text-primary-500" />
+          <span className="text-3xl font-bold gradient-text">AbyssFlow</span>
+        </div>
+
+        {/* Mode Toggle */}
+        <div className="flex gap-2 mb-6 bg-dark-800 p-1 rounded-lg">
+          <button
+            onClick={() => setMode('login')}
+            className={`flex-1 py-2 rounded-md transition ${
+              mode === 'login' 
+                ? 'bg-primary-600 text-white' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Connexion
+          </button>
+          <button
+            onClick={() => setMode('register')}
+            className={`flex-1 py-2 rounded-md transition ${
+              mode === 'register' 
+                ? 'bg-primary-600 text-white' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Inscription
+          </button>
+        </div>
+
+        {/* Method Toggle (QR or Phone) */}
+        <div className="flex gap-2 mb-6 bg-dark-800 p-1 rounded-lg">
+          <button
+            onClick={() => setMethod('qr')}
+            className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${
+              method === 'qr' 
+                ? 'bg-purple-600 text-white' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <QrCode className="w-4 h-4" />
+            QR Code
+          </button>
+          <button
+            onClick={() => setMethod('phone')}
+            className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${
+              method === 'phone' 
+                ? 'bg-purple-600 text-white' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Phone className="w-4 h-4" />
+            Téléphone
+          </button>
+        </div>
+
+        {/* QR Code Method */}
+        {method === 'qr' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center"
+          >
+            <div className="bg-white p-6 rounded-xl inline-block mb-4">
+              <QRCodeSVG 
+                value={qrCode} 
+                size={200}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            
+            <h3 className="text-xl font-semibold mb-2">Scanner le QR Code</h3>
+            <p className="text-gray-400 mb-4">
+              Ouvrez WhatsApp sur votre téléphone et scannez ce code
+            </p>
+
+            <div className="space-y-2 text-sm text-gray-400 text-left bg-dark-800 p-4 rounded-lg mb-4">
+              <p className="font-semibold text-white mb-2">📱 Instructions:</p>
+              <p>1. Ouvrez WhatsApp sur votre téléphone</p>
+              <p>2. Appuyez sur Menu (⋮) ou Paramètres</p>
+              <p>3. Sélectionnez "Appareils liés"</p>
+              <p>4. Appuyez sur "Lier un appareil"</p>
+              <p>5. Scannez ce QR code</p>
+            </div>
+
+            <button
+              onClick={handleQRConnect}
+              disabled={loading}
+              className="w-full py-3 bg-primary-600 hover:bg-primary-700 rounded-lg font-semibold transition flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Connexion en cours...
+                </>
+              ) : (
+                <>
+                  <QrCode className="w-5 h-5" />
+                  Générer nouveau QR
+                </>
+              )}
+            </button>
+          </motion.div>
+        )}
+
+        {/* Phone/Email Method */}
+        {method === 'phone' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'register' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Nom complet</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full px-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
+                      placeholder="Josias Almight"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Numéro de téléphone</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        className="w-full pl-12 pr-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
+                        placeholder="+237 6XX XXX XXX"
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    className="w-full pl-12 pr-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
+                    placeholder="vous@exemple.com"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Mot de passe</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    className="w-full pl-12 pr-12 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {mode === 'register' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Plan</label>
+                  <select
+                    value={formData.plan}
+                    onChange={(e) => setFormData({...formData, plan: e.target.value})}
+                    className="w-full px-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
+                  >
+                    <option value="free">Free - Gratuit</option>
+                    <option value="gold">Gold - $9.99/mois</option>
+                    <option value="pro">Pro - $24.99/mois</option>
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 rounded-lg font-semibold transition flex items-center justify-center gap-2 disabled:opacity-50 btn-glow"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    {mode === 'login' ? 'Connexion...' : 'Inscription...'}
+                  </>
+                ) : (
+                  mode === 'login' ? 'Se connecter' : "S'inscrire"
+                )}
+              </button>
+            </form>
+
+            {mode === 'login' && (
+              <div className="mt-4 text-center">
+                <a href="#" className="text-sm text-primary-400 hover:text-primary-300">
+                  Mot de passe oublié?
+                </a>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Footer */}
+        <div className="mt-6 text-center text-sm text-gray-400">
+          {mode === 'login' ? (
+            <p>
+              Pas encore de compte?{' '}
+              <button 
+                onClick={() => setMode('register')}
+                className="text-primary-400 hover:text-primary-300"
+              >
+                S'inscrire
+              </button>
+            </p>
+          ) : (
+            <p>
+              Déjà un compte?{' '}
+              <button 
+                onClick={() => setMode('login')}
+                className="text-primary-400 hover:text-primary-300"
+              >
+                Se connecter
+              </button>
+            </p>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  )
+}
