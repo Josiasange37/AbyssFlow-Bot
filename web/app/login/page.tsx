@@ -35,20 +35,85 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const response = await fetch(`http://localhost:3001${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mode === 'login' ? {
+          email: formData.email,
+          password: formData.password
+        } : {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          plan: formData.plan
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Authentication failed')
+      }
+      
+      // Save token and user data
+      localStorage.setItem('auth-token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      
+      // Check if user has payment
+      if (!data.user.hasPayment && data.user.plan === 'free') {
+        alert('Compte créé! Vous devez choisir un plan payant pour accéder au bot.')
+        window.location.href = '/dashboard/upgrade'
+      } else {
+        alert(`${mode === 'login' ? 'Connexion' : 'Inscription'} réussie!`)
+        window.location.href = '/dashboard'
+      }
+    } catch (error: any) {
+      alert(error.message || 'Erreur lors de l\'authentification')
+    } finally {
       setLoading(false)
-      alert(`${mode === 'login' ? 'Connexion' : 'Inscription'} réussie!`)
-    }, 2000)
+    }
   }
 
-  const handleQRConnect = () => {
+  const handleQRConnect = async () => {
     setLoading(true)
-    // Simulate QR code generation
-    setTimeout(() => {
-      setQrCode(`abyssflow://connect?session=${Date.now()}`)
+    
+    try {
+      const token = localStorage.getItem('auth-token')
+      
+      if (!token) {
+        alert('Vous devez être connecté pour générer un QR Code')
+        setLoading(false)
+        return
+      }
+      
+      const response = await fetch('http://localhost:3001/api/bot/qr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        if (response.status === 403) {
+          alert('❌ Paiement requis! Vous devez avoir un plan actif pour accéder au bot.')
+          window.location.href = '/dashboard/upgrade'
+          return
+        }
+        throw new Error(data.error || 'Failed to generate QR code')
+      }
+      
+      setQrCode(data.qrCode)
+    } catch (error: any) {
+      alert(error.message || 'Erreur lors de la génération du QR Code')
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   return (

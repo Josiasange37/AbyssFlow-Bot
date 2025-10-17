@@ -83,6 +83,55 @@ const lockedFeatures = [
 ]
 
 export default function UpgradePage() {
+  const [processing, setProcessing] = useState(false)
+  
+  const handleUpgrade = async (plan: string) => {
+    setProcessing(true)
+    
+    try {
+      const token = localStorage.getItem('auth-token')
+      
+      if (!token) {
+        alert('Vous devez être connecté')
+        window.location.href = '/login'
+        return
+      }
+      
+      const response = await fetch('http://localhost:3001/api/payment/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          plan,
+          paymentMethod: 'card'
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Payment failed')
+      }
+      
+      alert(`✅ Paiement réussi! Vous êtes maintenant sur le plan ${plan.toUpperCase()}`)
+      
+      // Update local storage
+      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      user.plan = plan
+      user.hasPayment = true
+      localStorage.setItem('user', JSON.stringify(user))
+      
+      // Redirect to dashboard
+      window.location.href = '/dashboard'
+    } catch (error: any) {
+      alert(error.message || 'Erreur lors du paiement')
+    } finally {
+      setProcessing(false)
+    }
+  }
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900 p-6">
       <div className="max-w-7xl mx-auto">
@@ -209,9 +258,11 @@ export default function UpgradePage() {
               </ul>
 
               <button
-                className={`block w-full py-3 ${plan.buttonColor} rounded-lg text-center font-semibold transition flex items-center justify-center gap-2`}
+                onClick={() => handleUpgrade(plan.name.toLowerCase())}
+                disabled={processing}
+                className={`block w-full py-3 ${plan.buttonColor} rounded-lg text-center font-semibold transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                Passer à {plan.name}
+                {processing ? 'Traitement...' : `Passer à ${plan.name}`}
                 <ArrowRight className="w-5 h-5" />
               </button>
             </motion.div>
