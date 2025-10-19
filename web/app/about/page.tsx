@@ -12,7 +12,14 @@ import {
   Zap,
   Heart,
   ArrowLeft,
-  ExternalLink
+  ExternalLink,
+  Circle,
+  Smartphone,
+  Palette,
+  Sparkles,
+  Users,
+  Rocket,
+  Laptop
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -48,37 +55,37 @@ const team = [
 ]
 
 const technologies = [
-  { name: 'Node.js', icon: '🟢', description: 'Backend puissant' },
-  { name: 'Baileys', icon: '📱', description: 'WhatsApp Web API' },
-  { name: 'Next.js', icon: '⚡', description: 'Frontend moderne' },
-  { name: 'TypeScript', icon: '💙', description: 'Type safety' },
-  { name: 'TailwindCSS', icon: '🎨', description: 'Design system' },
-  { name: 'Framer Motion', icon: '✨', description: 'Animations' },
+  { name: 'Node.js', icon: Circle, description: 'Backend puissant', color: 'text-green-500' },
+  { name: 'Baileys', icon: Smartphone, description: 'WhatsApp Web API', color: 'text-blue-500' },
+  { name: 'Next.js', icon: Zap, description: 'Frontend moderne', color: 'text-purple-500' },
+  { name: 'TypeScript', icon: Code, description: 'Type safety', color: 'text-blue-400' },
+  { name: 'TailwindCSS', icon: Palette, description: 'Design system', color: 'text-cyan-500' },
+  { name: 'Framer Motion', icon: Sparkles, description: 'Animations', color: 'text-pink-500' },
 ]
 
 const achievements = [
   {
     title: '10,000+ Utilisateurs',
     description: 'Plus de 10,000 utilisateurs actifs dans le monde entier',
-    icon: '👥',
+    icon: Users,
     color: 'from-blue-500 to-cyan-500'
   },
   {
     title: '99.9% Uptime',
     description: 'Disponibilité garantie 24/7 avec infrastructure robuste',
-    icon: '⚡',
+    icon: Zap,
     color: 'from-green-500 to-emerald-500'
   },
   {
     title: '50+ Commandes',
     description: 'Plus de 50 commandes puissantes pour tous vos besoins',
-    icon: '🚀',
+    icon: Rocket,
     color: 'from-purple-500 to-pink-500'
   },
   {
     title: 'Open Source',
     description: 'Code source disponible sur GitHub pour la communauté',
-    icon: '💻',
+    icon: Laptop,
     color: 'from-yellow-500 to-orange-500'
   },
 ]

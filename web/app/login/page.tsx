@@ -12,7 +12,12 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
+  Smartphone,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  ShieldCheck
 } from 'lucide-react'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
@@ -136,7 +141,7 @@ export default function LoginPage() {
       
       if (!response.ok) {
         if (response.status === 403) {
-          alert('❌ Paiement requis! Vous devez avoir un plan actif pour accéder au bot.')
+          alert('Paiement requis! Vous devez avoir un plan actif pour accéder au bot.')
           window.location.href = '/dashboard/upgrade'
           return
         }
@@ -250,11 +255,23 @@ export default function LoginPage() {
                 </p>
 
                 <div className="bg-dark-800 p-4 rounded-lg mb-6 text-left">
-                  <p className="font-semibold text-white mb-3">🔒 Pour accéder au bot, vous devez:</p>
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShieldCheck className="w-5 h-5 text-red-500" />
+                    <p className="font-semibold text-white">Pour accéder au bot, vous devez:</p>
+                  </div>
                   <div className="space-y-2 text-sm text-gray-400">
-                    <p>✅ Avoir un compte (vous l'avez)</p>
-                    <p>❌ Choisir un plan payant (Gold ou Pro)</p>
-                    <p>❌ Valider votre paiement</p>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <p>Avoir un compte (vous l'avez)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-4 h-4 text-red-500" />
+                      <p>Choisir un plan payant (Gold ou Pro)</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-4 h-4 text-red-500" />
+                      <p>Valider votre paiement</p>
+                    </div>
                   </div>
                 </div>
 
@@ -289,7 +306,10 @@ export default function LoginPage() {
                 </p>
 
                 <div className="space-y-2 text-sm text-gray-400 text-left bg-dark-800 p-4 rounded-lg mb-4">
-                  <p className="font-semibold text-white mb-2">📱 Instructions:</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Smartphone className="w-5 h-5 text-primary-500" />
+                    <p className="font-semibold text-white">Instructions:</p>
+                  </div>
                   <p>1. Ouvrez WhatsApp sur votre téléphone</p>
                   <p>2. Appuyez sur Menu (⋮) ou Paramètres</p>
                   <p>3. Sélectionnez "Appareils liés"</p>

@@ -13,7 +13,11 @@ import {
   MessageSquare,
   ArrowRight,
   Lock,
-  LogIn
+  LogIn,
+  CreditCard,
+  RefreshCw,
+  XCircle,
+  ShieldCheck
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -214,19 +218,31 @@ export default function PlansPage() {
           <h2 className="text-2xl font-bold mb-6">Questions Fréquentes</h2>
           <div className="space-y-4">
             <div>
-              <h3 className="font-semibold mb-2">💳 Quels moyens de paiement acceptez-vous?</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="w-5 h-5 text-primary-500" />
+                <h3 className="font-semibold">Quels moyens de paiement acceptez-vous?</h3>
+              </div>
               <p className="text-gray-400">Nous acceptons les cartes bancaires, PayPal, et les cryptomonnaies.</p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">🔄 Puis-je changer de plan?</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <RefreshCw className="w-5 h-5 text-primary-500" />
+                <h3 className="font-semibold">Puis-je changer de plan?</h3>
+              </div>
               <p className="text-gray-400">Oui, vous pouvez upgrader ou downgrader à tout moment. Les changements sont effectifs immédiatement.</p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">❌ Puis-je annuler mon abonnement?</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <XCircle className="w-5 h-5 text-red-500" />
+                <h3 className="font-semibold">Puis-je annuler mon abonnement?</h3>
+              </div>
               <p className="text-gray-400">Oui, vous pouvez annuler à tout moment. Aucun remboursement pour le mois en cours.</p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">🛡️ Mes données sont-elles sécurisées?</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <ShieldCheck className="w-5 h-5 text-green-500" />
+                <h3 className="font-semibold">Mes données sont-elles sécurisées?</h3>
+              </div>
               <p className="text-gray-400">Absolument. Nous utilisons un chiffrement de bout en bout et ne stockons aucune donnée sensible.</p>
             </div>
           </div>

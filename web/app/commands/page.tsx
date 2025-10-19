@@ -16,7 +16,10 @@ import {
   Lock,
   Check,
   X,
-  ArrowLeft
+  ArrowLeft,
+  Info,
+  AlertTriangle,
+  Crown as CrownIcon 
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -321,10 +324,10 @@ export default function CommandsPage() {
                 <div>
                   <h2 className="text-3xl font-bold">{category.title}</h2>
                   {category.adminOnly && (
-                    <p className="text-sm text-yellow-500">⚠️ Réservé aux admins et owners</p>
+                    <p className="text-sm text-yellow-500 flex items-center gap-1"><AlertTriangle className="w-4 h-4" /> Réservé aux admins et owners</p>
                   )}
                   {category.ownerOnly && (
-                    <p className="text-sm text-red-500">👑 Réservé aux owners uniquement</p>
+                    <p className="text-sm text-red-500 flex items-center gap-1"><CrownIcon className="w-4 h-4" /> Réservé aux owners uniquement</p>
                   )}
                 </div>
               </div>
