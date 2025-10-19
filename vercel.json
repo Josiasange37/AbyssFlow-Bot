@@ -1,10 +1,9 @@
 {
-  "name": "abyssflow-frontend",
   "version": 2,
-  "buildCommand": "cd web && npm run build",
-  "devCommand": "cd web && npm run dev",
-  "installCommand": "cd web && npm install",
-  "outputDirectory": "web/.next",
-  "framework": "nextjs",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./web/"
+  "builds": [
+    {
+      "src": "web/package.json",
+      "use": "@vercel/next"
+    }
+  ]
 }
