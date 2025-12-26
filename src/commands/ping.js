@@ -10,6 +10,6 @@ module.exports = {
         bot.metrics.lastPingAt = now;
 
         const response = `pong 🏓 ${latency}ms\nactive depuis ${bot.formatDuration(uptime)}`;
-        await sock.sendMessage(chatId, { text: response }, { quoted: message });
+        await bot.sendMessage(chatId, { text: response }, { quoted: message });
     }
 };

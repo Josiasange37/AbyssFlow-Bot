@@ -27,9 +27,9 @@ module.exports = {
             try { pic = await sock.profilePictureUrl(chatId, 'image'); } catch { }
 
             if (pic) {
-                await sock.sendMessage(chatId, { image: { url: pic }, caption: info, mentions: admins.map(a => a.id), quoted: message });
+                await bot.sendMessage(chatId, { image: { url: pic }, caption: info, mentions: admins.map(a => a.id), quoted: message });
             } else {
-                await sock.sendMessage(chatId, { text: info, mentions: admins.map(a => a.id), quoted: message });
+                await bot.sendMessage(chatId, { text: info, mentions: admins.map(a => a.id), quoted: message });
             }
 
         } catch (error) {

@@ -7,7 +7,7 @@ module.exports = {
     async execute({ sock, chatId, message, bot }) {
         try {
             await sock.groupSettingUpdate(chatId, 'announcement');
-            await sock.sendMessage(chatId, {
+            await bot.sendMessage(chatId, {
                 text: `🔒 Silence radio.\nSeuls les admins peuvent parler.`,
                 quoted: message
             });

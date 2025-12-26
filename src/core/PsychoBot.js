@@ -11,7 +11,11 @@ const https = require('https');
 const path = require('path');
 const sharp = require('sharp');
 const { CONFIG, THEMES, COLORS } = require('../config');
+const pino = require('pino');
 const { log, LOG_LEVEL_MAP, LOG_THRESHOLD } = require('../utils/logger');
+
+// Create a filtered pino logger for Baileys
+const baileysLogger = pino({ level: 'silent' });
 const {
   sleep,
   normalizeNumber,
@@ -214,6 +218,7 @@ class PsychoBot {
     }
 
     if (connection === 'close') {
+      this.sock = null; // Important: Nullify to prevent usage while closed
       const statusCode =
         lastDisconnect?.error?.output?.statusCode ??
         lastDisconnect?.error?.statusCode ??
@@ -316,7 +321,7 @@ class PsychoBot {
         try {
           await this.sock.groupParticipantsUpdate(groupId, [participantJid], 'remove');
 
-          await this.sock.sendMessage(groupId, {
+          await this.sendMessage(groupId, {
             text: [
               `wsh un bot sauvage a pop 🤖`,
               '',
@@ -332,7 +337,7 @@ class PsychoBot {
           log.error(`Failed to remove bot ${participantJid}:`, removeError.message);
 
           // Notify admins if bot couldn't be removed
-          await this.sock.sendMessage(groupId, {
+          await this.sendMessage(groupId, {
             text: [
               `⚠️ *Bot Détecté!*`,
               '',
@@ -386,9 +391,9 @@ class PsychoBot {
       try { ppUrl = await this.sock.profilePictureUrl(groupId, 'image'); } catch { }
 
       if (ppUrl) {
-        await this.sock.sendMessage(groupId, { image: { url: ppUrl }, caption: message, mentions: [participant] });
+        await this.sendMessage(groupId, { image: { url: ppUrl }, caption: message, mentions: [participant] });
       } else {
-        await this.sock.sendMessage(groupId, { text: message, mentions: [participant] });
+        await this.sendMessage(groupId, { text: message, mentions: [participant] });
       }
 
       log.info(`Smart welcome sent to ${participant} in ${groupId}`);
@@ -412,7 +417,7 @@ class PsychoBot {
 
       await sleep(1000);
 
-      await this.sock.sendMessage(groupId, {
+      await this.sendMessage(groupId, {
         text: text,
         mentions: [participant]
       });
@@ -420,6 +425,26 @@ class PsychoBot {
       log.info(`Smart goodbye sent for ${participant} in ${groupId}`);
     } catch (error) {
       log.error('Failed to send smart goodbye:', error.message);
+    }
+  }
+
+  /**
+   * Safe sendMessage wrapper that checks connection status
+   */
+  async sendMessage(jid, content, options = {}) {
+    if (!this.sock) {
+      log.warn(`Cannot send message to ${jid}: Socket not connected.`);
+      return null;
+    }
+    try {
+      return await this.sendMessage(jid, content, options);
+    } catch (error) {
+      if (error?.message === 'Connection Closed') {
+        log.warn(`Failed to send message to ${jid}: Connection Closed.`);
+      } else {
+        log.error(`SendMessage error for ${jid}:`, error.message);
+      }
+      return null;
     }
   }
 
@@ -520,7 +545,7 @@ class PsychoBot {
     try {
       const senderName = `@${sender.split('@')[0]}`;
 
-      await this.sock.sendMessage(chatId, {
+      await this.sendMessage(chatId, {
         text: [
           `✏️ *Message Modifié*`,
           '',
@@ -552,7 +577,7 @@ class PsychoBot {
         await this.resendDeletedMedia(chatId, cachedMessage, senderName);
       } else if (cachedMessage.text) {
         // Text message
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           text: [
             `🗑️ *Message Supprimé*`,
             '',
@@ -583,37 +608,37 @@ class PsychoBot {
       // Try to forward the original message if possible
       if (msg.imageMessage) {
         mediaType = 'Image';
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           image: msg.imageMessage.url ? { url: msg.imageMessage.url } : msg.imageMessage,
           caption: `🗑️ *Image Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_`,
           mentions: [cachedMessage.sender]
         });
       } else if (msg.videoMessage) {
         mediaType = 'Vidéo';
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           video: msg.videoMessage.url ? { url: msg.videoMessage.url } : msg.videoMessage,
           caption: `🗑️ *Vidéo Supprimée*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupérée par le Water Hashira_`,
           mentions: [cachedMessage.sender]
         });
       } else if (msg.stickerMessage) {
         mediaType = 'Sticker';
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           sticker: msg.stickerMessage.url ? { url: msg.stickerMessage.url } : msg.stickerMessage
         });
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           text: `🗑️ *Sticker Supprimé*\n\n👤 *Par:* ${senderName}\n\n🌊 _Récupéré par le Water Hashira_`,
           mentions: [cachedMessage.sender]
         });
       } else if (msg.audioMessage) {
         mediaType = 'Audio';
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           audio: msg.audioMessage.url ? { url: msg.audioMessage.url } : msg.audioMessage,
           mimetype: msg.audioMessage.mimetype,
           mentions: [cachedMessage.sender]
         });
       } else if (msg.documentMessage) {
         mediaType = 'Document';
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           document: msg.documentMessage.url ? { url: msg.documentMessage.url } : msg.documentMessage,
           mimetype: msg.documentMessage.mimetype,
           fileName: msg.documentMessage.fileName || 'document',
@@ -626,7 +651,7 @@ class PsychoBot {
       log.error('Failed to resend deleted media:', error.message, error.stack);
       // Fallback to text notification
       try {
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           text: `🗑️ *Media Supprimé*\n\n👤 *Par:* ${senderName}\n\n⚠️ Le média ne peut plus être récupéré (supprimé du serveur WhatsApp)\n\n🌊 _Water Hashira_`,
           mentions: [cachedMessage.sender]
         });
@@ -801,8 +826,8 @@ class PsychoBot {
 
       // Empty interaction feedback
       if (!cleanText && !media) {
-        if (isTagMentioned) await this.sock.sendMessage(chatId, { text: "Wesh ? Tu m'as appelé ? 🤙⚡ (Ajoute du texte pour que je réponde !)" }, { quoted: message });
-        else if (isReplyToBot) await this.sock.sendMessage(chatId, { text: "Je t'écoute le sang... 👂 Dis-moi un truc !" }, { quoted: message });
+        if (isTagMentioned) await this.sendMessage(chatId, { text: "Wesh ? Tu m'as appelé ? 🤙⚡ (Ajoute du texte pour que je réponde !)" }, { quoted: message });
+        else if (isReplyToBot) await this.sendMessage(chatId, { text: "Je t'écoute le sang... 👂 Dis-moi un truc !" }, { quoted: message });
         return;
       }
 
@@ -845,7 +870,7 @@ class PsychoBot {
 
         const typingDuration = calculateTypingDuration(finalResponse.length);
         await simulateTyping(this.sock, chatId, typingDuration);
-        await this.sock.sendMessage(chatId, {
+        await this.sendMessage(chatId, {
           text: finalResponse,
           mentions: mentionedJids
         }, { quoted: message });
@@ -1002,7 +1027,7 @@ class PsychoBot {
     const { quotedMessage = null } = options;
 
     try {
-      await this.sock.sendMessage(jid, {
+      await this.sendMessage(jid, {
         text: text,
         mentions: options.mentions || []
       }, { quoted: quotedMessage });

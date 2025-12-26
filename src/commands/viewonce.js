@@ -34,7 +34,7 @@ module.exports = {
 
             msgContent.mentions = [sender];
 
-            await sock.sendMessage(chatId, msgContent, { quoted: message });
+            await bot.sendMessage(chatId, msgContent, { quoted: message });
 
         } catch (error) {
             await bot.sendSafeMessage(chatId, `oups, le message s'est autodétruit avant que je le chope.`);
