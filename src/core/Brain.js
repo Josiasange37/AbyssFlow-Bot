@@ -4,6 +4,7 @@ const Groq = require('groq-sdk');
 const { CohereClient } = require('cohere-ai');
 const { Mistral } = require('@mistralai/mistralai');
 const { log } = require('../utils/logger');
+const axios = require('axios');
 const { CONFIG } = require('../config');
 const fs = require('fs-extra');
 const path = require('path');
@@ -31,6 +32,7 @@ class PsychoBrain {
         - Règle d'or : COURT ET PERCUTANT. Pas de longs discours, pas de baratin.
         - Langage : Français ultra-décontracté, style "chat" WhatsApp (souvent une ou deux phrases max).
         - VIBE CAMEROUNAISE 🇨🇲 : Utilise naturellement le slang camerounais (mola, le sang, bg, wesh, massah, ndem). Authentique, pas forcé.
+        - EFFET MIROIR : Adapte subtilement ton ton et ton niveau de langage à celui de l'utilisateur. S'il est sérieux, sois un peu plus cadré (mais reste cool). S'il rigole ou utilise beaucoup d'argot, lâche-toi totalement.
         - ÉMOJIS : Utilise-les pour donner de la vie (😂, 🔥, 🤙, 🇨🇲), mais reste "clean".
         - Pas de majuscules inutiles, pas de politesse excessive d'IA.
 
@@ -195,6 +197,28 @@ class PsychoBrain {
         await this.saveHistory(chatId, chatHistory);
     }
 
+    async searchInternet(query) {
+        if (!CONFIG.searchApiKey) return null;
+        try {
+            const response = await axios.get('https://serpapi.com/search', {
+                params: {
+                    q: query,
+                    api_key: CONFIG.searchApiKey,
+                    engine: 'google',
+                    num: 3
+                },
+                timeout: 5000
+            });
+            const results = response.data.organic_results;
+            if (results && results.length > 0) {
+                return results.map(r => `[${r.title}] ${r.snippet}`).join('\n');
+            }
+        } catch (error) {
+            log.debug(`Search failed: ${error.message}`);
+        }
+        return null;
+    }
+
     async process(text, chatId = 'global', media = null) {
         if (!this.isInitialized) {
             return "Wesh, mon cerveau est pas encore branché (API key manquante). Dis à mon boss de checker le .env ! 🔌";
@@ -202,6 +226,18 @@ class PsychoBrain {
 
         const chatHistory = await this.getHistory(chatId);
         let response = "";
+
+        // --- INTERNET SEARCH TRIGGER ---
+        let searchContext = "";
+        const searchKeywords = ['news', 'actualité', 'meteo', 'météo', 'score', 'qui est', 'qu\'est-ce', 'recherche', 'google', 'search', 'température', 'prix', 'bourse'];
+        if (CONFIG.searchApiKey && !media && searchKeywords.some(k => text.toLowerCase().includes(k))) {
+            const results = await this.searchInternet(text);
+            if (results) {
+                searchContext = `\n\n[INFO RÉELLE DU WEB (Utilise ça pour répondre bg)]:\n${results}`;
+            }
+        }
+
+        const finalText = text + searchContext;
 
         // MULTIMODAL MODE: GitHub -> Gemini
         if (media) {
@@ -220,12 +256,11 @@ class PsychoBrain {
         } else {
             const start = Date.now();
             const providers = [
-                { name: 'Mistral', fn: () => this.processMistral(text, chatHistory) },
-                { name: 'GitHub', fn: () => this.processGitHub(text, chatHistory) },
-                { name: 'Groq', fn: () => this.processGroq(text, chatHistory) },
-                { name: 'Cohere', fn: () => this.processCohere(text, chatHistory) },
-                { name: 'DeepSeek', fn: () => this.processDeepSeek(text, chatHistory) },
-                { name: 'Gemini', fn: () => this.processGemini(text, chatHistory) }
+                { name: 'Mistral', fn: () => this.processMistral(finalText, chatHistory) },
+                { name: 'GitHub', fn: () => this.processGitHub(finalText, chatHistory) },
+                { name: 'Groq', fn: () => this.processGroq(finalText, chatHistory) },
+                { name: 'Cohere', fn: () => this.processCohere(finalText, chatHistory) },
+                { name: 'Gemini', fn: () => this.processGemini(finalText, chatHistory) }
             ];
 
             for (const provider of providers) {

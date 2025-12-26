@@ -12,7 +12,9 @@ const path = require('path');
 const sharp = require('sharp');
 const { CONFIG, THEMES, COLORS } = require('../config');
 const pino = require('pino');
-const { log, LOG_LEVEL_MAP, LOG_THRESHOLD } = require('../utils/logger');
+const UserStats = require('../database/models/UserStats');
+const Warning = require('../database/models/Warning');
+const { log } = require('../utils/logger');
 
 // Create a filtered pino logger for Baileys
 const baileysLogger = pino({ level: 'silent' });
@@ -807,6 +809,19 @@ class PsychoBot {
       if (handled) return;
     }
 
+    const isGroupAdmin = isGroup ? await this.isGroupAdmin(chatId, sender) : false;
+
+    // --- AUTO MODÉRATION 2.0: Check for spam/scams ---
+    if (isGroup && !isOwner && !isGroupAdmin) {
+      const isSafe = await this.checkAutoMod(chatId, sender, text, message);
+      if (!isSafe) return; // Stop processing if message was handled/deleted
+    }
+
+    // --- XP & LEVELING: Track group activity ---
+    if (isGroup && !message.key.fromMe) {
+      this.updateUserStats(chatId, sender).catch(e => log.error('XP Error:', e.message));
+    }
+
     // --- GLOBAL AWARENESS: Log every message into history (only if not fromMe and not triggered) ---
     if (Brain && text && !message.key.fromMe && !isBotTriggered) {
       const senderName = message.pushName || sender.split('@')[0];
@@ -1061,6 +1076,96 @@ class PsychoBot {
     } catch (error) {
       log.warn(`GitHub fetch failed: ${error.message}`);
       return null;
+    }
+  }
+
+  async updateUserStats(groupId, userId) {
+    try {
+      const xpToGain = Math.floor(Math.random() * 11) + 10; // 10-20 XP
+
+      let stats = await UserStats.findOne({ userId, groupId });
+
+      if (!stats) {
+        stats = new UserStats({ userId, groupId });
+      }
+
+      // 1 minute cooldown for XP gain (not message count)
+      const now = Date.now();
+      const lastMessage = new Date(stats.lastMessageAt).getTime();
+
+      stats.messagesCount += 1;
+
+      if (now - lastMessage > 60000) {
+        stats.xp += xpToGain;
+        stats.lastMessageAt = now;
+
+        // Level up logic (Simple: lvl * 100 XP required)
+        const xpNeeded = stats.level * 100;
+        if (stats.xp >= xpNeeded) {
+          stats.level += 1;
+          stats.xp = 0; // Reset or keep overflow
+
+          // Notify level up with Psycho flow
+          const userTag = `@${userId.split('@')[0]}`;
+          await this.sendMessage(groupId, {
+            text: `🔥 *LEVEL UP !* 🔥\n\nBravo ${userTag}, tu passes au *Niveau ${stats.level}* ! 🚀\nTon flow devient puissant mola. 🤙⚔️⚡`,
+            mentions: [userId]
+          });
+        }
+      }
+
+      await stats.save();
+    } catch (error) {
+      log.error('Failed to update user stats:', error.message);
+    }
+  }
+
+  async checkAutoMod(chatId, sender, text, message) {
+    if (!text) return true;
+
+    // 1. Scam Links detection
+    const scamPatterns = [/wa\.me\/settings/i, /free-robux/i, /bit\.ly/i, /gift-card/i];
+    if (scamPatterns.some(p => p.test(text))) {
+      try {
+        await this.sock.sendMessage(chatId, { delete: message.key });
+        await this.addWarning(chatId, sender, "Lien suspect/Scam détecté");
+        log.info(`Auto-Mod: Deleted scam message from ${sender} in ${chatId}`);
+        return false;
+      } catch (e) { log.debug('Failed to delete scam message:', e.message); }
+    }
+
+    // 2. Dangerous characters (Hidden characters spam)
+    if (text.length > 5000) {
+      await this.sock.sendMessage(chatId, { delete: message.key });
+      await this.addWarning(chatId, sender, "Message trop long (Spam/Crash)");
+      return false;
+    }
+
+    return true;
+  }
+
+  async addWarning(groupId, userId, reason) {
+    try {
+      let stats = await Warning.findOne({ userId, groupId });
+      if (!stats) stats = new Warning({ userId, groupId });
+
+      stats.warnings += 1;
+      stats.reasons.push({ text: reason });
+      await stats.save();
+
+      const userTag = `@${userId.split('@')[0]}`;
+      const warnMsg = `⚠️ *AVERTISSEMENT* ⚠️\n\n👤 *Utilisateur:* ${userTag}\n🔰 *Raison:* ${reason}\n🚩 *Total:* ${stats.warnings}/3\n\n_Fais attention bg, à 3 avertissements c'est le kick automatique ! ⚔️_`;
+
+      await this.sendMessage(groupId, { text: warnMsg, mentions: [userId] });
+
+      if (stats.warnings >= 3) {
+        await this.sendMessage(groupId, { text: `💀 ${userTag} a atteint la limite. Adios mola ! 💨`, mentions: [userId] });
+        await this.sock.groupParticipantsUpdate(groupId, [userId], "remove");
+        // Reset warnings after kick
+        await Warning.deleteOne({ userId, groupId });
+      }
+    } catch (error) {
+      log.error('Failed to add warning:', error.message);
     }
   }
 
