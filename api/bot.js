@@ -5,10 +5,37 @@ const PsychoBot = require('../src/core/PsychoBot');
 const { log } = require('../src/utils/logger');
 const { CONFIG } = require('../src/config');
 const { keepAlive } = require('../src/utils/keepAlive');
-require("dotenv").config();
+require("dotenv").config({ path: path.resolve(__dirname, '../.env') });
 
 // Port configuration
 const PORT = process.env.PORT || 8080;
+
+// Handle uncaught exceptions and unhandled rejections
+const handleGlobalError = (error, type) => {
+  const msg = error?.message || String(error);
+  const ignorableErrors = [
+    'Connection Closed',
+    'Timed Out',
+    'conflict',
+    'Stream Errored',
+    'Bad MAC',
+    'No session found',
+    'No matching sessions',
+    'EPIPE',
+    'ECONNRESET',
+    'PreKeyError'
+  ];
+
+  if (ignorableErrors.some(e => msg.includes(e))) {
+    log.warn(`[GLOBAL ${type}] Caught expected non-fatal error: ${msg}. Bot will attempt recovery.`);
+    return;
+  }
+  log.error(`[GLOBAL ${type}] Uncaught Exception:`, error);
+  process.exit(1);
+};
+
+process.on('uncaughtException', (error) => handleGlobalError(error, 'EXCEPTION'));
+process.on('unhandledRejection', (reason) => handleGlobalError(reason, 'REJECTION'));
 
 // Basic health check
 app.get("/", (req, res) => {
