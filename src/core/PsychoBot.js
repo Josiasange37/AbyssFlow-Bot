@@ -16,6 +16,7 @@ const pino = require('pino');
 const cron = require('node-cron');
 const UserStats = require('../database/models/UserStats');
 const Warning = require('../database/models/Warning');
+const GroupSettings = require('../database/models/GroupSettings');
 const { log, LOG_LEVEL_MAP, LOG_THRESHOLD } = require('../utils/logger');
 
 // Create a filtered pino logger for Baileys
@@ -298,13 +299,26 @@ class PsychoBot {
     }
   }
 
+  async getGroupSettings(groupId) {
+    try {
+      let settings = await GroupSettings.findOne({ groupId });
+      if (!settings) {
+        settings = await GroupSettings.create({ groupId });
+      }
+      return settings;
+    } catch (error) {
+      log.error('Failed to get group settings:', error.message);
+      return { welcome: true, antiDelete: true, autoMod: true, chatbot: true }; // Fallback
+    }
+  }
+
   async onGroupParticipantsUpdate(update) {
     try {
       const { id: groupId, participants, action } = update;
 
       if (!groupId || !participants || !participants.length) return;
 
-      const settings = this.getGroupSettings(groupId);
+      const settings = await this.getGroupSettings(groupId);
 
       for (const participant of participants) {
         // Check for antibot when someone is added
@@ -315,10 +329,14 @@ class PsychoBot {
           }
 
           // Automatic welcome message
-          await this.sendSmartWelcomeMessage(groupId, participant);
+          if (settings.welcome) {
+            await this.sendSmartWelcomeMessage(groupId, participant);
+          }
         } else if (action === 'remove' || action === 'leave') {
           // Automatic goodbye message
-          await this.sendSmartGoodbyeMessage(groupId, participant);
+          if (settings.welcome) {
+            await this.sendSmartGoodbyeMessage(groupId, participant);
+          }
         }
       }
     } catch (error) {
@@ -616,8 +634,11 @@ class PsychoBot {
           const cachedMessage = this.messageCache.get(messageId);
 
           if (cachedMessage) {
-            log.info(`Message deletion detected: ${messageId} in ${chatId}`);
-            await this.notifyMessageDeletion(chatId, cachedMessage);
+            const settings = await this.getGroupSettings(chatId);
+            if (settings.antiDelete) {
+              log.info(`Message deletion detected: ${messageId} in ${chatId}`);
+              await this.notifyMessageDeletion(chatId, cachedMessage);
+            }
             // Keep in cache for a bit in case of multiple delete events
             setTimeout(() => this.messageCache.delete(messageId), 5000);
           } else {
@@ -885,9 +906,10 @@ class PsychoBot {
     }
 
     const isGroupAdmin = isGroup ? await this.isGroupAdmin(chatId, sender) : false;
+    const settings = isGroup ? await this.getGroupSettings(chatId) : null;
 
     // --- AUTO MODÉRATION 2.0: Check for spam/scams ---
-    if (isGroup && !isOwner && !isGroupAdmin) {
+    if (isGroup && settings?.autoMod && !isOwner && !isGroupAdmin) {
       const isSafe = await this.checkAutoMod(chatId, sender, text, message);
       if (!isSafe) return; // Stop processing if message was handled/deleted
     }
@@ -897,7 +919,7 @@ class PsychoBot {
       this.updateUserStats(chatId, sender).catch(e => log.error('XP Error:', e.message));
     }
 
-    // --- GLOBAL AWARENESS: Log every message into history (only if not fromMe and not triggered) ---
+    // --- GLOBAL AWARENESS: Log every message into history ---
     if (Brain && text && !message.key.fromMe && !isBotTriggered) {
       const senderName = message.pushName || sender.split('@')[0];
       Brain.logMessage(chatId, senderName, text).catch(e => log.error('Logging Error:', e.message));
@@ -908,9 +930,7 @@ class PsychoBot {
       const commandLine = text.slice(CONFIG.prefix.length).trim();
       if (!commandLine) return;
 
-      const isGroupAdmin = isGroup ? await this.isGroupAdmin(chatId, sender) : false;
       const canUseAdminCommands = isOwner || isGroupAdmin;
-
       if (LOG_THRESHOLD >= LOG_LEVEL_MAP.info) {
         log.info(`Cmd: ${commandLine.split(/\s+/)[0]} | ${sender} (Owner: ${isOwner})`);
       }
@@ -924,6 +944,8 @@ class PsychoBot {
 
     // B. AI Processing
     if (isBotTriggered && Brain) {
+      // Check if chatbot is enabled for this group
+      if (isGroup && settings && !settings.chatbot) return;
       // Exempt owner from rate limit
       if (!isOwner && !this.withinRateLimit(sender)) return;
 
