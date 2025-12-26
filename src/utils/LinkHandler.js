@@ -57,29 +57,38 @@ class LinkHandler {
 
             // Array of reliable download APIs as fallbacks
             const apis = [
-                `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(url)}`,
-                `https://api.vreden.my.id/api/tiktok?url=${encodeURIComponent(url)}`, // Specialized TikTok
-                `https://api.agatz.xyz/api/tiktok?url=${encodeURIComponent(url)}`,
-                `https://api.agatz.xyz/api/youtube?url=${encodeURIComponent(url)}`
+                { url: `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(url)}`, type: 'general' },
+                { url: `https://api.vreden.my.id/api/tiktok?url=${encodeURIComponent(url)}`, type: 'tiktok' },
+                { url: `https://api.agatz.xyz/api/tiktok?url=${encodeURIComponent(url)}`, type: 'tiktok' },
+                { url: `https://api.agatz.xyz/api/instagram?url=${encodeURIComponent(url)}`, type: 'instagram' },
+                { url: `https://api.botcahx.eu.org/api/dowloader/tiktok?url=${encodeURIComponent(url)}&apikey=PsychoBot`, type: 'tiktok' },
+                { url: `https://api.botcahx.eu.org/api/dowloader/instagram?url=${encodeURIComponent(url)}&apikey=PsychoBot`, type: 'instagram' },
+                { url: `https://bk9.site/download/tiktok?url=${encodeURIComponent(url)}`, type: 'tiktok' }
             ];
 
             let downloadUrl = null;
             let success = false;
 
-            for (const apiUrl of apis) {
+            for (const api of apis) {
+                // Filter APIs based on URL if possible to save time
+                if (api.type !== 'general' && !url.includes(api.type)) continue;
+
                 try {
-                    const response = await axios.get(apiUrl, { timeout: 15000 });
+                    const response = await axios.get(api.url, { timeout: 10000 });
                     const res = response.data;
 
-                    // Handle different API response structures
-                    downloadUrl = res.result?.url || res.result?.video || res.data?.url || res.url;
+                    // Support multiple response formats (vreden, agatz, botcahx, etc.)
+                    downloadUrl = res.result?.url || res.result?.video || res.data?.url || res.data?.video || res.url ||
+                        (res.result?.data?.find(d => d.type === 'video') || res.result?.data?.[0])?.url;
 
-                    if (downloadUrl) {
+                    if (downloadUrl && typeof downloadUrl === 'string' && downloadUrl.startsWith('http')) {
                         success = true;
+                        log.info(`✅ Video found via ${api.type} API: ${api.url.split('?')[0]}`);
                         break;
                     }
                 } catch (e) {
-                    continue; // try next API
+                    log.debug(`Downloader API failed: ${api.url.split('?')[0]} - ${e.message}`);
+                    continue;
                 }
             }
 
