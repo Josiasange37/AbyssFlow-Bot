@@ -40,7 +40,7 @@ const CONFIG = {
   cohereApiKey: process.env.COHERE_API_KEY || '',
   mistralApiKey: process.env.MISTRAL_API_KEY || '',
   mistralAgentId: process.env.MISTRAL_AGENT_ID || 'ag_019b5b38190670e7a41f56581ab8f052',
-  mongoUri: process.env.MONGO_URI || '',
+  mongoUri: process.env.MONGO_URI || process.env.MONGODB_URI || '',
   searchApiKey: process.env.SEARCH_API_KEY || '', // SerpApi or Google Custom Search
   // Constants
   FALLBACK_VERSION: [2, 3000, 38],
