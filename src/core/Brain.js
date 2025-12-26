@@ -450,6 +450,36 @@ class PsychoBrain {
 
         return result.response.text();
     }
+
+    async generateVideoDescription(metadata) {
+        try {
+            const prompt = `Génère une petite description ultra-concise (MAX 1 PHRASE) pour cette vidéo : "${metadata.title || "Lien Video"}".
+            Utilise ton identité "Psycho Bo". Sois pro mais avec ton petit grain de folie ou ton avis d'expert tech. 
+            Évite le blabla inutile, vas direct au but avec du style.`;
+
+            // Try Mistral first
+            if (this.mistral) {
+                const response = await this.mistral.chat.complete({
+                    model: 'mistral-large-latest',
+                    messages: [{ role: 'user', content: prompt }],
+                    maxTokens: 50
+                });
+                return response.choices[0].message.content.trim().replace(/"/g, '');
+            }
+
+            // Fallback to Gemini
+            if (this.geminiModel) {
+                const result = await this.geminiModel.generateContent(prompt);
+                const response = await result.response;
+                return response.text().trim().replace(/"/g, '');
+            }
+
+            return "Une vidéo intéressante détectée par mes systèmes. 🛠️";
+        } catch (error) {
+            log.error('Video description generation failed:', error.message);
+            return "Analyse tactique : contenu vidéo validé. ✅";
+        }
+    }
 }
 
 module.exports = new PsychoBrain();
