@@ -1,0 +1,27 @@
+module.exports = {
+    name: 'toimg',
+    aliases: ['toimage', 'topng'],
+    description: 'Convert sticker to image',
+    async execute({ sock, chatId, message, bot }) {
+        try {
+            const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            const stickerMessage = quoted?.stickerMessage;
+
+            if (!stickerMessage) {
+                return await bot.sendSafeMessage(chatId, `faut répondre à un sticker avec la commande bg.`);
+            }
+
+            await bot.sendSafeMessage(chatId, `⏳ Conversion en cours...`);
+
+            const buffer = await bot.downloadMedia(stickerMessage);
+
+            await sock.sendMessage(chatId, {
+                image: buffer,
+                caption: `Tiens bg ! ✨`
+            }, { quoted: message });
+
+        } catch (error) {
+            await bot.sendSafeMessage(chatId, `j'ai pas réussi à convertir :/`);
+        }
+    }
+};
