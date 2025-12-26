@@ -4,7 +4,11 @@ const { log } = require('./logger');
 
 class LinkHandler {
     constructor() {
-        this.videoDomains = ['youtube.com', 'youtu.be', 'tiktok.com', 'instagram.com', 'fb.watch', 'facebook.com'];
+        this.videoDomains = [
+            'youtube.com', 'youtu.be', 'tiktok.com', 'instagram.com',
+            'fb.watch', 'facebook.com', 'twitter.com', 'x.com',
+            'pinteres.it', 'pinterest.com', 'threads.net', 'capcut.com'
+        ];
     }
 
     async handle(bot, chatId, text, message) {
@@ -51,21 +55,46 @@ class LinkHandler {
         try {
             await bot.sendMessage(chatId, { text: "🎬 Vidéo détectée ! Je prépare le téléchargement mola... ⏳" }, { quoted: message });
 
-            // Using a free public API for downloads to avoid heavy local processing
-            // Note: This is a placeholder for a robust downloader. 
-            // Real-world robust downloading often requires dedicated workers.
-            const response = await axios.get(`https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(url)}`);
+            // Array of reliable download APIs as fallbacks
+            const apis = [
+                `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(url)}`,
+                `https://api.vreden.my.id/api/tiktok?url=${encodeURIComponent(url)}`, // Specialized TikTok
+                `https://api.agatz.xyz/api/tiktok?url=${encodeURIComponent(url)}`,
+                `https://api.agatz.xyz/api/youtube?url=${encodeURIComponent(url)}`
+            ];
 
-            if (response.data.status && response.data.result && response.data.result.url) {
+            let downloadUrl = null;
+            let success = false;
+
+            for (const apiUrl of apis) {
+                try {
+                    const response = await axios.get(apiUrl, { timeout: 15000 });
+                    const res = response.data;
+
+                    // Handle different API response structures
+                    downloadUrl = res.result?.url || res.result?.video || res.data?.url || res.url;
+
+                    if (downloadUrl) {
+                        success = true;
+                        break;
+                    }
+                } catch (e) {
+                    continue; // try next API
+                }
+            }
+
+            if (success && downloadUrl) {
                 await bot.sendMessage(chatId, {
-                    video: { url: response.data.result.url },
-                    caption: `✅ Vidéo téléchargée propre !\n🔗 ${url}`
+                    video: { url: downloadUrl },
+                    caption: `✅ C'est prêt bg ! Flow Psycho Bo 🤙⚡\n🔗 ${url}`
                 }, { quoted: message });
                 return true;
+            } else {
+                throw new Error('All APIs failed');
             }
         } catch (error) {
             log.error(`Video download failed for ${url}: ${error.message}`);
-            await bot.sendMessage(chatId, { text: "Désolé bg, j'arrive pas à graille cette vidéo pour le moment. 💀" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "Désolé bg, j'arrive pas à graille cette vidéo pour le moment. 💀\n\n_Le serveur de téléchargement est peut-être saturé, réessaie plus tard !_ " }, { quoted: message });
         }
         return false;
     }

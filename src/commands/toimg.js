@@ -11,9 +11,9 @@ module.exports = {
                 return await bot.sendSafeMessage(chatId, `faut répondre à un sticker avec la commande bg.`);
             }
 
-            await bot.sendSafeMessage(chatId, `⏳ Conversion en cours...`);
+            await bot.sendMessage(chatId, { text: `⏳ Conversion en cours...` }, { quoted: message });
 
-            const buffer = await bot.downloadMedia(stickerMessage);
+            const buffer = await bot.downloadMedia(stickerMessage, 'sticker');
 
             await bot.sendMessage(chatId, {
                 image: buffer,

@@ -154,6 +154,7 @@ class PsychoBot {
         state = mongoAuth.state;
         saveCreds = mongoAuth.saveCreds;
       } else {
+        log.warn('⚠️ MONGO_URI is not set in environment. Falling back to local files.');
         log.info('Using local file system for session storage 📁');
         await fs.ensureDir(path.resolve(CONFIG.sessionPath));
         ({ state, saveCreds } = await useMultiFileAuthState(CONFIG.sessionPath));
@@ -704,22 +705,25 @@ class PsychoBot {
     }
   }
 
-  async downloadMedia(mediaMessage) {
+  async downloadMedia(mediaMessage, type = null) {
     try {
-      // Create a proper message structure for downloadMediaMessage
-      const messageType = Object.keys(mediaMessage)[0];
+      // If type isn't provided, try to guess or use the message itself if it's a full object
+      const messageType = type ? `${type}Message` : (Object.keys(mediaMessage)[0]?.includes('Message') ? Object.keys(mediaMessage)[0] : null);
+
+      if (!messageType && !mediaMessage.url) {
+        throw new Error('Could not determine media type');
+      }
+
       const fakeMessage = {
         key: { id: 'fake-id' },
-        message: {
-          [messageType]: mediaMessage
-        }
+        message: type ? { [messageType]: mediaMessage } : mediaMessage
       };
 
       const buffer = await downloadMediaMessage(
         fakeMessage,
         'buffer',
         {},
-        { logger: log, reuploadRequest: this.sock.updateMediaMessage }
+        { logger: baileysLogger, reuploadRequest: this.sock?.updateMediaMessage }
       );
       return buffer;
     } catch (error) {
@@ -799,7 +803,7 @@ class PsychoBot {
     const urlPattern = /https?:\/\/[^\s]+/;
     if (text && urlPattern.test(text) && !message.key.fromMe) {
       const linkStart = Date.now();
-      const handled = await LinkHandler.handle(this.sock, chatId, text, message);
+      const handled = await LinkHandler.handle(this, chatId, text, message);
       log.info(`🔗 Link handling took ${Date.now() - linkStart}ms`);
       if (handled) return;
     }
