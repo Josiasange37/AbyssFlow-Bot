@@ -306,11 +306,10 @@ class PsychoBot {
             await this.checkAndRemoveBot(groupId, participant);
           }
 
-          // Send welcome message if enabled
-          if (settings.welcome.enabled) {
-            await this.sendSmartWelcomeMessage(groupId, participant);
-          }
-        } else if ((action === 'remove' || action === 'leave') && settings.goodbye.enabled) {
+          // Automatic welcome message
+          await this.sendSmartWelcomeMessage(groupId, participant);
+        } else if (action === 'remove' || action === 'leave') {
+          // Automatic goodbye message
           await this.sendSmartGoodbyeMessage(groupId, participant);
         }
       }
