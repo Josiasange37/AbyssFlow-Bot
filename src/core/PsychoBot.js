@@ -19,6 +19,8 @@ const {
   calculateTypingDuration,
   withTimeout
 } = require('../utils/helpers');
+const { connectDB } = require('../database');
+const LinkHandler = require('../utils/LinkHandler');
 const Brain = require('./Brain');
 
 // Constants used in class
@@ -53,6 +55,9 @@ class PsychoBot {
 
     // Load available command plugins
     this.loadCommands();
+
+    // Initialize Database (Async)
+    connectDB().catch(e => log.error('DB Init Error:', e.message));
   }
 
   loadGroupSettings() {
@@ -721,6 +726,13 @@ class PsychoBot {
 
     const isBotTriggered = isTagMentioned || isReplyToBot || isDM || (isGroup && isNameMentioned);
 
+    // Link Detection (Auto-Banner & Video Download)
+    const urlPattern = /https?:\/\/[^\s]+/;
+    if (text && urlPattern.test(text) && !message.key.fromMe) {
+      const handled = await LinkHandler.handle(this.sock, chatId, text, message);
+      if (handled) return; // Stop if link was handled
+    }
+
     // --- GLOBAL AWARENESS: Log every message into history (only if not fromMe and not triggered) ---
     if (Brain && text && !message.key.fromMe && !isBotTriggered) {
       const senderName = message.pushName || sender.split('@')[0];
@@ -791,11 +803,40 @@ class PsychoBot {
         return;
       }
 
-      const response = await Brain.process(cleanText || "Analyse ce média.", chatId, media);
+      // --- AI CONTEXT ENHANCEMENT: Group Participants ---
+      let participantsInfo = "";
+      let participantsMap = new Map();
+      if (isGroup) {
+        try {
+          const groupMetadata = await this.sock.groupMetadata(chatId);
+          participantsInfo = "\nUTILISATEURS DANS LE GROUPE (Tagge-les avec @Nom s'ils t'insultent ou si tu veux leur parler) : \n";
+          groupMetadata.participants.forEach(p => {
+            const name = p.id.split('@')[0];
+            participantsInfo += `@${name} `;
+            participantsMap.set(name.toLowerCase(), p.id);
+          });
+        } catch (e) { log.debug('Failed to get group metadata for context'); }
+      }
+
+      const response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media);
       if (response) {
-        const typingDuration = calculateTypingDuration(response.length);
+        // --- POST-PROCESS MENTIONS: Convert @Name to actual mentions ---
+        const mentionedJids = [];
+        const finalResponse = response.replace(/@(\w+)/g, (match, name) => {
+          const jid = participantsMap.get(name.toLowerCase());
+          if (jid) {
+            mentionedJids.push(jid);
+            return match; // Keep the text as @Name
+          }
+          return match;
+        });
+
+        const typingDuration = calculateTypingDuration(finalResponse.length);
         await simulateTyping(this.sock, chatId, typingDuration);
-        await this.sock.sendMessage(chatId, { text: response }, { quoted: message });
+        await this.sock.sendMessage(chatId, {
+          text: finalResponse,
+          mentions: mentionedJids
+        }, { quoted: message });
       }
       return;
     }

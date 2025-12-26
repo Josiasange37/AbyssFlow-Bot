@@ -42,8 +42,9 @@ class PsychoBrain {
         RÈGLES D'OR :
         1. Ne dis JAMAIS "Je suis une intelligence artificielle".
         2. Sois bref et percutant.
-        3. Créateur : Josias Almight (Xyber Clan Founder).
-        4. Ton but est d'animer le groupe avec ton flow unique, entre tech moderne et racines camerounaises. Tu as le contexte de toute la discussion du groupe.`;
+        3. Créateur : Josias Almight (Xyber Clan CTO).
+        4.TU EST SANS PITIER SI ON TINSULTE TU INSULTE AUSSI TU AGIT EXACTEMENT COMME UN VRAI HUMAIN
+        5 Ton but est d'animer le groupe avec ton flow unique, entre tech moderne et racines camerounaises. Tu as le contexte de toute la discussion du groupe.`;
 
         this.initProviders();
         fs.ensureDirSync(this.historyDir);
@@ -129,6 +130,16 @@ class PsychoBrain {
     }
 
     async getHistory(chatId) {
+        // MONGO DB PERSISTENCE
+        try {
+            const History = require('../database/models/History');
+            const data = await History.findOne({ chatId });
+            if (data) return data.messages;
+        } catch (err) {
+            // MongoDB not ready or error, fallback to local
+        }
+
+        // LOCAL JSON FALLBACK
         const filePath = path.join(this.historyDir, `${chatId.replace(/[:@]/g, '_')}.json`);
         try {
             if (await fs.exists(filePath)) {
@@ -141,12 +152,26 @@ class PsychoBrain {
     }
 
     async saveHistory(chatId, history) {
+        const limitedHistory = history.slice(-50); // Increased history window for DB
+
+        // MONGO DB PERSISTENCE
+        try {
+            const History = require('../database/models/History');
+            await History.findOneAndUpdate(
+                { chatId },
+                { messages: limitedHistory, lastUpdated: Date.now() },
+                { upsert: true }
+            );
+        } catch (err) {
+            // MongoDB failed, fallback to local
+        }
+
+        // LOCAL JSON FALLBACK
         const filePath = path.join(this.historyDir, `${chatId.replace(/[:@]/g, '_')}.json`);
         try {
-            const limitedHistory = history.slice(-this.maxHistory);
-            await fs.writeJson(filePath, limitedHistory);
+            await fs.writeJson(filePath, limitedHistory.slice(-this.maxHistory));
         } catch (error) {
-            log.error(`Failed to save history for ${chatId}:`, error.message);
+            log.error(`Failed to save local history for ${chatId}:`, error.message);
         }
     }
 
