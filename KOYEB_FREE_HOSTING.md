@@ -1,49 +1,83 @@
-# ☁️ Hébergement Gratuit sur Koyeb
+# ☁️ Déploiement Complet sur Koyeb (Gratuit & 24h/24)
 
-## 🎯 Objectif
-Déployer **Psycho Bot** gratuitement et 24h/24 sans avoir besoin de laisser ton PC allumé.
+Ce guide détaille **absolument tout** pour mettre Psycho Bot en ligne gratuitement. Suis chaque étape scrupuleusement.
 
-## 📋 Étapes
-
-### 1️⃣ Précharger ton Code sur GitHub
-1. Crée un repo privé (ou public) sur ton GitHub.
-2. Push tout le code du bot dedans (avec le `Dockerfile` que j'ai créé).
-
-### 2️⃣ Créer un Compte Koyeb
-1. Inscris-toi sur [Koyeb](https://app.koyeb.com/auth/signup). (Pas besoin de carte bancaire pour le plan gratuit).
-
-### 3️⃣ Créer l'App
-1. Clique sur **"Create Service"**.
-2. Choisis **"GitHub"** comme source.
-3. Sélectionne ton repo `AbyssFlow-Bot`.
-4. Dans **"Builder"**, choisis **"Dockerfile"**.
-
-### 4️⃣ Configurer les Variables (TRÈS IMPORTANT)
-Dans l'onglet **"Variables"**, ajoute toutes celles de ton `.env` :
-- `MISTRAL_API_KEY`
-- `GITHUB_TOKEN`
-- `GROQ_API_KEY`
-- `COHERE_API_KEY`
-- `HF_TOKEN`
-- `GEMINI_API_KEY`
-- `BOT_OWNERS` (ton numéro)
-- `BOT_PREFIX`
-- `PORT` = `8080` (C'est indispensable pour que Koyeb sache que l'app est lancée).
-
-### 5️⃣ Déployer
-1. Clique sur **"Deploy"**.
-2. Attends 2-3 minutes.
-3. Va dans **"Logs"** pour voir le QR Code apparaître.
-4. Scanne-le avec ton WhatsApp.
-
-## ⚠️ Note sur la Persistance
-Sur le plan **gratuit** de Koyeb (Nano instance), les fichiers sont supprimés à chaque redémarrage.
-- **Solution** : Une fois connecté, le bot restera en ligne tant que Koyeb ne le redémarre pas. Si ça redémarre, tu devras peut-être scanner à nouveau si tu n'utilises pas de base de données externe pour la session (comme MongoDB).
-
-## ✅ Avantages
-- ✅ Gratuit (0€)
-- ✅ Toujours en ligne
-- ✅ Facile à mettre à jour via GitHub
+## 📋 Pré-requis
+1. Un compte [GitHub](https://github.com).
+2. Tes clés API (.env) à portée de main.
+3. Ton téléphone pour scanner le QR Code.
 
 ---
-*Guide créé par AntiGravity pour le Xyber Clan.*
+
+## 🚀 Étape 1 : Préparer ton GitHub
+1. Crée un nouveau dépôt (Repository) sur GitHub (nomme-le `Psycho-Bot`).
+2. Mets le repo en **Privé** (recommandé pour protéger ton code).
+3. Utilise la commande suivante dans ton terminal local pour envoyer le code :
+   ```bash
+   git add .
+   git commit -m "Déploiement Koyeb"
+   git push origin main
+   ```
+
+---
+
+## 🎡 Étape 2 : Configuration sur Koyeb
+1. Inscris-toi sur [Koyeb.com](https://app.koyeb.com).
+2. Clique sur **"Create Service"**.
+3. Sélectionne **"GitHub"**.
+4. Autorise Koyeb à accéder à tes dépôts et sélectionne `Psycho-Bot`.
+5. **Type de déploiement** : Choisis **"Dockerfile"**.
+6. **Région** : Choisis `Frankfurt` ou `Washington, D.C.` (le plus proche de toi).
+7. **Instance** : Choisis le plan **"Nano"** (le seul qui est 100% gratuit).
+
+---
+
+## 🔑 Étape 3 : Variables d'Environnement (VITAL)
+C'est ici que l'intelligence du bot se configure. Dans la section **Environment Variables**, ajoute :
+
+| Nom de la Variable | Valeur |
+| :--- | :--- |
+| `MISTRAL_API_KEY` | Ta clé Mistral |
+| `MISTRAL_AGENT_ID` | `ag_019b5b38190670e7a41f56581ab8f052` |
+| `GITHUB_TOKEN` | Ton token GitHub |
+| `GROQ_API_KEY` | Ta clé Groq |
+| `COHERE_API_KEY` | Ta clé Cohere |
+| `HF_TOKEN` | Ton token Hugging Face |
+| `GEMINI_API_KEY` | Ta clé Gemini |
+| `BOT_OWNERS` | Ton numéro (ex: `237...`) |
+| `BOT_PREFIX` | `*` (ou ce que tu veux) |
+| `PORT` | `8080` (Obligatoire pour le Health Check) |
+| `NODE_ENV` | `production` |
+
+---
+
+## 📱 Étape 4 : Connexion & Logs
+1. Clique sur **"Deploy"**.
+2. Une fois que le statut passe à **"Healthy"**, clique sur l'onglet **"Logs"**.
+3. Attends de voir le **QR Code** s'afficher dans la console.
+4. Ouvre WhatsApp sur ton téléphone : **Appareils connectés** > **Connecter un appareil**.
+5. Scanne le code affiché sur l'écran de Koyeb.
+6. **Bravo !** Le bot est en ligne. Tu peux fermer ton navigateur.
+
+---
+
+## 🛠️ Dépannage (Troubleshooting)
+
+### ❓ Le QR Code ne s'affiche pas
+- Vérifie les logs. Si tu vois `Module not found`, c'est qu'il manque une dépendance. Mais avec mon `Dockerfile`, ça devrait être parfait.
+- Si le log s'arrête, rafraîchis la page Koyeb.
+
+### ❓ Le bot se déconnecte souvent
+- Sur le plan gratuit, Koyeb peut redémarrer ton instance de temps en temps.
+- Puisque Psycho Bot utilise un dossier de session local, tu devras peut-être scanner à nouveau si le dossier est effacé.
+- **Astuce PRO** : Pour une session 100% permanente, il faudrait utiliser une base de données MongoDB, mais pour commencer, Koyeb gratuit est top !
+
+### ❓ Triggers (Quand est-ce qu'il répond ?)
+Le bot est configuré pour répondre UNIQUEMENT :
+1. Si on le **tague** (`@PsychoBot`).
+2. Si on lui **répond** directement (Reply).
+3. Si le mot **"bot"** apparaît dans le message du groupe.
+4. En **Message Privé** (DM), il répond toujours.
+
+---
+*Guide complet par Josias Almight & AntiGravity.*

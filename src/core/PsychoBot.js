@@ -713,9 +713,8 @@ class PsychoBot {
     const isReplyToBot = contextInfo?.participant && normalizeNumber(contextInfo.participant) === myNumber;
 
     const normalizedText = (text || '').toLowerCase();
-    // Strict requirement: "bot", "almight", or "psycho"
+    // Strict requirement: "bot" or "psycho" (to avoid false positives with owner name)
     const isNameMentioned = normalizedText.includes('bot') ||
-      normalizedText.includes('almight') ||
       normalizedText.includes('psycho');
 
     const isDM = !isGroup;
