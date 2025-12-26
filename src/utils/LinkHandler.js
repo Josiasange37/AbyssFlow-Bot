@@ -1,6 +1,7 @@
 const ogs = require('open-graph-scraper');
 const axios = require('axios');
 const { log } = require('./logger');
+const Brain = require('../core/Brain');
 
 class LinkHandler {
     constructor() {
@@ -84,6 +85,7 @@ class LinkHandler {
             ];
 
             let downloadUrl = null;
+            let videoMetadata = { title: "" };
             let success = false;
 
             for (const api of apis) {
@@ -98,6 +100,9 @@ class LinkHandler {
                         }
                     });
                     const res = response.data;
+
+                    // Extract Title if possible
+                    videoMetadata.title = res.data?.title || res.result?.title || res.title || videoMetadata.title;
 
                     // Ultra-aggressive parsing for different API formats
                     downloadUrl = res.data?.play || res.data?.hdplay || res.result?.url || res.result?.video || res.result?.hd || res.result?.nowatermark ||
@@ -118,6 +123,9 @@ class LinkHandler {
             }
 
             if (success && downloadUrl) {
+                // Generate AI Description
+                const aiDescription = await Brain.generateVideoDescription(videoMetadata);
+
                 // Download the video buffer to ensure it works (bypass header blocks)
                 const videoResponse = await axios.get(downloadUrl, {
                     responseType: 'arraybuffer',
@@ -132,7 +140,7 @@ class LinkHandler {
 
                 await bot.sendMessage(chatId, {
                     video: buffer,
-                    caption: `✅ C'est prêt bg ! Flow Psycho Bo 🤙⚡\n🔗 ${url}`
+                    caption: `🎥 *ANALYSE VIDÉO*\n\n"${aiDescription}"\n\n🔗 ${url}\n⚡ _Flow Psycho Bo God Mode_`
                 }, { quoted: message });
                 return true;
             } else {
