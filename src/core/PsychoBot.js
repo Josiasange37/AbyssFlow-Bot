@@ -26,6 +26,7 @@ const {
 const { connectDB } = require('../database');
 const LinkHandler = require('../utils/LinkHandler');
 const Brain = require('./Brain');
+const useMongoAuthState = require('./mongoAuth');
 
 // Constants used in class
 const GITHUB_CACHE_TTL_MS = CONFIG.GITHUB_CACHE_TTL_MS;
@@ -146,8 +147,17 @@ class PsychoBot {
         Brain.init().catch(err => log.error('Brain Init Error:', err.message));
       }
 
-      await fs.ensureDir(path.resolve(CONFIG.sessionPath));
-      const { state, saveCreds } = await useMultiFileAuthState(CONFIG.sessionPath);
+      let state, saveCreds;
+      if (CONFIG.mongoUri) {
+        log.info('Using MongoDB for session storage 🔌');
+        const mongoAuth = await useMongoAuthState('psycho-bot');
+        state = mongoAuth.state;
+        saveCreds = mongoAuth.saveCreds;
+      } else {
+        log.info('Using local file system for session storage 📁');
+        await fs.ensureDir(path.resolve(CONFIG.sessionPath));
+        ({ state, saveCreds } = await useMultiFileAuthState(CONFIG.sessionPath));
+      }
 
       let version;
       try {
@@ -192,6 +202,11 @@ class PsychoBot {
 
       this.pendingReconnect = false;
       log.info('Socket initialized.');
+
+      // Start lock heartbeat if connected to Mongo
+      if (CONFIG.mongoUri) {
+        this.startHeartbeat();
+      }
     } catch (error) {
       log.error('Startup error:', error.message);
       this.scheduleReconnect();
@@ -426,6 +441,34 @@ class PsychoBot {
     } catch (error) {
       log.error('Failed to send smart goodbye:', error.message);
     }
+  }
+
+  /**
+   * Prevents multiple instances from fighting for the same connection
+   */
+  async startHeartbeat() {
+    if (!CONFIG.mongoUri) return;
+
+    const Lock = require('../database/models/Lock');
+    const os = require('os');
+
+    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+
+    this.heartbeatInterval = setInterval(async () => {
+      try {
+        await Lock.findOneAndUpdate(
+          { instanceId: 'primary' },
+          {
+            lastHeartbeat: new Date(),
+            processId: process.pid,
+            hostname: os.hostname()
+          },
+          { upsert: true }
+        );
+      } catch (err) {
+        log.debug('Lock heartbeat failed:', err.message);
+      }
+    }, 60_000); // Update every minute
   }
 
   /**
