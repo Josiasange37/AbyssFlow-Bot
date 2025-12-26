@@ -1,23 +1,31 @@
-# AbyssFlow Bot Dockerfile
-FROM node:20-alpine
+# Use Node.js LTS (Long Term Support) image
+FROM node:20-slim
 
-# Set working directory
+# Install dependencies for canvas/puppeteer/sharp if needed (optional but good for stability)
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    imagemagick \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm install --production
 
-# Copy application files
+# Copy the rest of the application
 COPY . .
 
-# Create directories
-RUN mkdir -p auth_info_baileys data
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=8080
 
-# Expose port (optional, for health checks)
-EXPOSE 3000
+# Expose the API port
+EXPOSE 8080
 
-# Start the bot
-CMD ["npm", "start"]
+# Use api/bot.js as the entry point for cloud deployments
+CMD ["node", "api/bot.js"]
