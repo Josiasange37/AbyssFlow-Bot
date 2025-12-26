@@ -1,13 +1,18 @@
+const LinkHandler = require('../utils/LinkHandler');
+
 module.exports = {
     name: 'download',
-    aliases: ['dl', 'db'],
-    description: 'Download media from links (Placeholder/Lightweight)',
-    async execute({ chatId, args, bot }) {
+    aliases: ['dl', 'play', 'video', 'music'],
+    description: 'Download media from links (TikTok, YouTube, IG, etc.)',
+    async execute({ chatId, args, bot, message }) {
         const url = args[0];
-        if (!url) return await bot.sendSafeMessage(chatId, 'mets un lien bg');
+        if (!url) {
+            return await bot.sendMessage(chatId, { text: "❌ Tu n'as pas mis de lien, chef ! Utilisation: *.dl [lien]*" }, { quoted: message });
+        }
 
-        await bot.sendSafeMessage(chatId, `⚙️ Je vais voir ce que je peux faire pour ce lien...\n(Note: Version ultra légère, ça marche pas sur tout !)`);
-
-        await bot.sendSafeMessage(chatId, `Désolé bg, sur cette version gratuite je peux pas encore télécharger des fichiers lourds. 📉`);
+        const handled = await LinkHandler.handle(bot, chatId, url, message);
+        if (!handled) {
+            await bot.sendMessage(chatId, { text: "💀 Désolé bg, j'ai pas pu gérer ce lien. Vérifie qu'il est correct !" }, { quoted: message });
+        }
     }
 };
