@@ -4,6 +4,7 @@ const path = require("path");
 const PsychoBot = require('../src/core/PsychoBot');
 const { log } = require('../src/utils/logger');
 const { CONFIG } = require('../src/config');
+const { keepAlive } = require('../src/utils/keepAlive');
 require("dotenv").config();
 
 // Port configuration
@@ -20,6 +21,11 @@ app.get("/", (req, res) => {
     const bot = new PsychoBot();
     await bot.start();
     log.info('Bot instance started via API wrapper');
+
+    // Prevent Render from sleeping
+    if (process.env.APP_URL) {
+      keepAlive(process.env.APP_URL);
+    }
   } catch (error) {
     log.error('Failed to start bot instance:', error);
   }

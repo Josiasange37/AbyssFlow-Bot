@@ -19,7 +19,8 @@ Render est une excellente alternative à Koyeb. Voici comment déployer Psycho B
 ### 4️⃣ Configurer les Variables
 Remplis toutes les clés API (Mistral, Gemini, etc.) que tu as dans ton `.env`. 
 > [!IMPORTANT]
-> Ajoute absolument ta variable `MONGO_URI` (MongoDB Atlas) pour que le bot ne perde pas sa session et son historique à chaque redémarrage de Render !
+> - **MONGO_URI** : Obligatoire pour ne rien perdre au redémarrage.
+> - **APP_URL** : Une fois le service créé, Render te donne une URL (ex: `https://psycho-bot.onrender.com`). Copie cette URL et colle-la dans la variable `APP_URL` pour que le script **Anti-Sommeil** garde le bot réveillé 24h/24 !
 
 ### 5️⃣ Connexion
 - Une fois le service créé, va dans **"Events"** ou **"Logs"**.
