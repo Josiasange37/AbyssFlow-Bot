@@ -11,9 +11,23 @@ require('dotenv').config();
 
 // Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (error) => {
-  // Ignore "Connection Closed" errors from Baileys, as they are handled internally
-  if (error?.message === 'Connection Closed') {
-    log.warn('Caught expected Connection Closed error. Bot will attempt reconnection.');
+  const msg = error?.message || String(error);
+  // Ignore non-fatal errors that Baileys/Socket handles internally or that are expected during network jitter
+  const ignorableErrors = [
+    'Connection Closed',
+    'Timed Out',
+    'conflict',
+    'Stream Errored',
+    'Bad MAC',
+    'No session found',
+    'No matching sessions',
+    'EPIPE',
+    'ECONNRESET',
+    'PreKeyError'
+  ];
+
+  if (ignorableErrors.some(e => msg.includes(e))) {
+    log.warn(`Caught expected non-fatal error: ${msg}. Bot will attempt recovery.`);
     return;
   }
   log.error('Uncaught Exception:', error);
@@ -21,8 +35,22 @@ process.on('uncaughtException', (error) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  if (reason?.message === 'Connection Closed') {
-    log.warn('Caught expected Connection Closed rejection. Bot will attempt reconnection.');
+  const msg = reason?.message || String(reason);
+  const ignorableErrors = [
+    'Connection Closed',
+    'Timed Out',
+    'conflict',
+    'Stream Errored',
+    'Bad MAC',
+    'No session found',
+    'No matching sessions',
+    'EPIPE',
+    'ECONNRESET',
+    'PreKeyError'
+  ];
+
+  if (ignorableErrors.some(e => msg.includes(e))) {
+    log.warn(`Caught expected non-fatal rejection: ${msg}. Bot will attempt recovery.`);
     return;
   }
   log.error('Unhandled Rejection at:', promise, 'reason:', reason);

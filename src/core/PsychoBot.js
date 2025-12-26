@@ -437,7 +437,7 @@ class PsychoBot {
       return null;
     }
     try {
-      return await this.sendMessage(jid, content, options);
+      return await this.sock.sendMessage(jid, content, options);
     } catch (error) {
       if (error?.message === 'Connection Closed') {
         log.warn(`Failed to send message to ${jid}: Connection Closed.`);
