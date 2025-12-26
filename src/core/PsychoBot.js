@@ -839,6 +839,19 @@ class PsychoBot {
 
     const sender = message.key.participant || message.key.remoteJid;
     const isGroup = chatId.endsWith('@g.us');
+
+    // --- SELECTIVE MUTE: Enforcement ---
+    if (isGroup && this.mutedUsers && this.mutedUsers.has(chatId)) {
+      const mutedList = this.mutedUsers.get(chatId);
+      if (mutedList.has(sender) && !message.key.fromMe) {
+        log.info(`Muted user ${sender} tried to talk in ${chatId}. Deleting...`);
+        await this.sock.sendMessage(chatId, {
+          delete: message.key
+        });
+        return;
+      }
+    }
+
     const isOwner = this.isOwner(sender);
 
     // Robust Context Extraction
