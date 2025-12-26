@@ -12,9 +12,10 @@ const path = require('path');
 const sharp = require('sharp');
 const { CONFIG, THEMES, COLORS } = require('../config');
 const pino = require('pino');
+const cron = require('node-cron');
 const UserStats = require('../database/models/UserStats');
 const Warning = require('../database/models/Warning');
-const { log } = require('../utils/logger');
+const { log, LOG_LEVEL_MAP, LOG_THRESHOLD } = require('../utils/logger');
 
 // Create a filtered pino logger for Baileys
 const baileysLogger = pino({ level: 'silent' });
@@ -207,9 +208,13 @@ class PsychoBot {
       log.info('Socket initialized.');
 
       // Start lock heartbeat if connected to Mongo
-      if (CONFIG.mongoUri) {
-        this.startHeartbeat();
-      }
+      // Start distributed heartbeat
+      this.startHeartbeat();
+
+      // Start Scheduled Greetings (5 AM & Midnight)
+      this.startScheduledGreetings();
+
+      return this.sock;
     } catch (error) {
       log.error('Startup error:', error.message);
       this.scheduleReconnect();
@@ -1311,6 +1316,54 @@ class PsychoBot {
 
   // Owner Commands
 
+  async broadcast(text) {
+    try {
+      if (!this.sock) return;
+
+      const chats = await this.sock.groupFetchAllParticipating();
+      const groupIds = Object.keys(chats);
+
+      log.info(`Broadcasting to ${groupIds.length} groups...`);
+
+      for (const groupId of groupIds) {
+        try {
+          await this.sendMessage(groupId, { text });
+          // Small delay to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (err) {
+          log.error(`Failed to send broadcast to ${groupId}:`, err.message);
+        }
+      }
+    } catch (error) {
+      log.error('Broadcast failed:', error.message);
+    }
+  }
+
+  async startScheduledGreetings() {
+    log.info('⏰ Scheduled greetings activated (5 AM & Midnight)');
+
+    // 1. Bonjour Comunidad (5:00 AM)
+    cron.schedule('0 5 * * *', async () => {
+      log.info('🌅 Morning greeting triggered');
+      if (Brain) {
+        const msg = await Brain.generateAutoMessage('morning');
+        if (msg) await this.broadcast(msg);
+      }
+    }, {
+      timezone: "Africa/Douala" // Cameroon time
+    });
+
+    // 2. Good Coding Time (Midnight)
+    cron.schedule('0 0 * * *', async () => {
+      log.info('🌙 Midnight coding greeting triggered');
+      if (Brain) {
+        const msg = await Brain.generateAutoMessage('midnight');
+        if (msg) await this.broadcast(msg);
+      }
+    }, {
+      timezone: "Africa/Douala" // Cameroon time
+    });
+  }
 }
 
 

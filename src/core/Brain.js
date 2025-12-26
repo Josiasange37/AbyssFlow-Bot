@@ -290,6 +290,38 @@ class PsychoBrain {
         return response;
     }
 
+    async generateAutoMessage(type) {
+        if (!this.isInitialized) return null;
+
+        let prompt = "";
+        if (type === 'morning') {
+            prompt = "Il est 5h du matin. Envoie un message de bonjour ultra cool et motivant à la communauté XyberClan. Utilise ton flow Psycho Bo (slang camerounais, vibe guerrier tech). Sois court et percutant. 🇨🇲🔥🤙";
+        } else if (type === 'midnight') {
+            prompt = "Il est minuit. C'est l'heure du coding intense. Envoie un message 'Good coding time' aux développeurs du XyberClan. Encourage-les à brosser le code avec ton flow Psycho Bo. ⚔️⚡💻";
+        } else {
+            return null;
+        }
+
+        try {
+            // Use Mistral as primary for auto-messages
+            if (this.mistral) {
+                const response = await this.mistral.agents.complete({
+                    agentId: CONFIG.mistralAgentId,
+                    messages: [{ role: "user", content: prompt }]
+                });
+                return response.choices[0].message.content;
+            }
+            // Fallback to Gemini if Mistral fails
+            if (this.geminiModel) {
+                const result = await this.geminiModel.generateContent(prompt);
+                return result.response.text();
+            }
+        } catch (error) {
+            log.error(`Auto-message generation failed (${type}):`, error.message);
+        }
+        return null;
+    }
+
     async processMistral(text, chatHistory) {
         if (!this.mistral) throw new Error('MISTRAL_NOT_READY');
 
