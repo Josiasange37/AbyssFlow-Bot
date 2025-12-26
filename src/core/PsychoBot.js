@@ -46,6 +46,7 @@ class PsychoBot {
     // Message cache for tracking edits and deletions (max 1000 messages)
     this.messageCache = new Map();
     this.maxCacheSize = 1000;
+    this.metadataCache = new Map(); // Cache for group participants
 
     if (!CONFIG.owners.length) {
       log.warn('No owners configured. Set BOT_OWNERS in .env');
@@ -808,7 +809,16 @@ class PsychoBot {
       let participantsMap = new Map();
       if (isGroup) {
         try {
-          const groupMetadata = await this.sock.groupMetadata(chatId);
+          // Use cached metadata if fresh (TTL: 5 minutes)
+          const cached = this.metadataCache.get(chatId);
+          let groupMetadata;
+          if (cached && (Date.now() - cached.time < 5 * 60 * 1000)) {
+            groupMetadata = cached.data;
+          } else {
+            groupMetadata = await this.sock.groupMetadata(chatId);
+            this.metadataCache.set(chatId, { data: groupMetadata, time: Date.now() });
+          }
+
           participantsInfo = "\nUTILISATEURS DANS LE GROUPE (Tagge-les avec @Nom s'ils t'insultent ou si tu veux leur parler) : \n";
           groupMetadata.participants.forEach(p => {
             const name = p.id.split('@')[0];

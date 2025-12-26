@@ -18,7 +18,8 @@ class PsychoBrain {
         this.cohere = null;
         this.mistral = null;
         this.historyDir = path.join(__dirname, '..', 'data', 'history');
-        this.maxHistory = 20; // Increased context for group awareness
+        this.maxHistory = 20;
+        this.memoryHistory = new Map(); // In-memory cache for chat history
         this.isInitialized = false;
 
         this.systemPrompt = `IDENTITÉ : 
@@ -130,20 +131,30 @@ class PsychoBrain {
     }
 
     async getHistory(chatId) {
-        // MONGO DB PERSISTENCE
+        // 1. MEMORY CACHE (Fastest)
+        if (this.memoryHistory.has(chatId)) {
+            return this.memoryHistory.get(chatId);
+        }
+
+        // 2. MONGO DB PERSISTENCE
         try {
             const History = require('../database/models/History');
             const data = await History.findOne({ chatId });
-            if (data) return data.messages;
+            if (data) {
+                this.memoryHistory.set(chatId, data.messages);
+                return data.messages;
+            }
         } catch (err) {
-            // MongoDB not ready or error, fallback to local
+            // MongoDB not ready or error
         }
 
-        // LOCAL JSON FALLBACK
+        // 3. LOCAL JSON FALLBACK
         const filePath = path.join(this.historyDir, `${chatId.replace(/[:@]/g, '_')}.json`);
         try {
             if (await fs.exists(filePath)) {
-                return await fs.readJson(filePath);
+                const localData = await fs.readJson(filePath);
+                this.memoryHistory.set(chatId, localData);
+                return localData;
             }
         } catch (error) {
             log.error(`Failed to read history for ${chatId}:`, error.message);
@@ -152,27 +163,22 @@ class PsychoBrain {
     }
 
     async saveHistory(chatId, history) {
-        const limitedHistory = history.slice(-50); // Increased history window for DB
+        const limitedHistory = history.slice(-50);
 
-        // MONGO DB PERSISTENCE
-        try {
-            const History = require('../database/models/History');
-            await History.findOneAndUpdate(
-                { chatId },
-                { messages: limitedHistory, lastUpdated: Date.now() },
-                { upsert: true }
-            );
-        } catch (err) {
-            // MongoDB failed, fallback to local
-        }
+        // 1. UPDATE MEMORY CACHE
+        this.memoryHistory.set(chatId, limitedHistory);
 
-        // LOCAL JSON FALLBACK
+        // 2. MONGO DB PERSISTENCE (Async, don't wait)
+        const History = require('../database/models/History');
+        History.findOneAndUpdate(
+            { chatId },
+            { messages: limitedHistory, lastUpdated: Date.now() },
+            { upsert: true }
+        ).catch(e => log.debug(`DB save failed: ${e.message}`));
+
+        // 3. LOCAL JSON FALLBACK (Async, don't wait)
         const filePath = path.join(this.historyDir, `${chatId.replace(/[:@]/g, '_')}.json`);
-        try {
-            await fs.writeJson(filePath, limitedHistory.slice(-this.maxHistory));
-        } catch (error) {
-            log.error(`Failed to save local history for ${chatId}:`, error.message);
-        }
+        fs.writeJson(filePath, limitedHistory.slice(-this.maxHistory)).catch(e => log.debug(`Local save failed: ${e.message}`));
     }
 
     // New method to record messages without replying
