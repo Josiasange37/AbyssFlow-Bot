@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: psycho-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node api/bot.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: BOT_OWNERS
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: SEARCH_API_KEY
+        sync: false

@@ -46,6 +46,8 @@ C'est ici que l'intelligence du bot se configure. Dans la section **Environment 
 | `GEMINI_API_KEY` | Ta clé Gemini |
 | `BOT_OWNERS` | Ton numéro (ex: `237...`) |
 | `BOT_PREFIX` | `*` (ou ce que tu veux) |
+| `MONGO_URI` | Ton URI MongoDB Atlas (optionnel pour mémoire infinie) |
+| `SEARCH_API_KEY` | Ta clé SerpApi ou Google Search (optionnel pour .google) |
 | `PORT` | `8080` (Obligatoire pour le Health Check) |
 | `NODE_ENV` | `production` |
 
