@@ -210,7 +210,7 @@ class PsychoBrain {
                 }
             }
         } else {
-            // TEXT ONLY: Mistral -> GitHub -> Groq -> Cohere -> DeepSeek -> Gemini
+            const start = Date.now();
             const providers = [
                 { name: 'Mistral', fn: () => this.processMistral(text, chatHistory) },
                 { name: 'GitHub', fn: () => this.processGitHub(text, chatHistory) },
@@ -222,152 +222,157 @@ class PsychoBrain {
 
             for (const provider of providers) {
                 try {
+                    const pStart = Date.now();
                     response = await provider.fn();
-                    if (response) break;
+                    if (response) {
+                        log.info(`✅ ${provider.name} responded in ${Date.now() - pStart}ms`);
+                        break;
+                    }
                 } catch (err) {
                     log.warn(`⚠️ ${provider.name} failed. Trying next...`);
                 }
             }
+
+            log.info(`🧠 Total Brain processing time: ${Date.now() - start}ms`);
+
+            if (!response) return "Désolé bg, mes cerveaux sont grillés. J'arrive plus à réfléchir. 😵‍💫";
+
+            // Record response in history
+            chatHistory.push({ role: "model", text: response });
+            await this.saveHistory(chatId, chatHistory);
+
+            return response;
         }
-
-        if (!response) return "Désolé bg, mes cerveaux sont grillés. J'arrive plus à réfléchir. 😵‍💫";
-
-        // Record response in history
-        chatHistory.push({ role: "model", text: response });
-        await this.saveHistory(chatId, chatHistory);
-
-        return response;
-    }
 
     async processMistral(text, chatHistory) {
-        if (!this.mistral) throw new Error('MISTRAL_NOT_READY');
+            if (!this.mistral) throw new Error('MISTRAL_NOT_READY');
 
-        const messages = [
-            { role: "system", content: this.systemPrompt },
-            ...chatHistory.map(msg => ({
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.text
-            })),
-            { role: "user", content: text }
-        ];
+            const messages = [
+                { role: "system", content: this.systemPrompt },
+                ...chatHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.text
+                })),
+                { role: "user", content: text }
+            ];
 
-        const result = await this.mistral.agents.complete({
-            agentId: CONFIG.mistralAgentId,
-            messages: messages
-        });
+            const result = await this.mistral.agents.complete({
+                agentId: CONFIG.mistralAgentId,
+                messages: messages
+            });
 
-        return result.choices[0].message.content;
-    }
+            return result.choices[0].message.content;
+        }
 
     async processGitHub(text, chatHistory, media = null) {
-        const content = [{ type: "text", text: text || "Analyse ce média." }];
-        if (media) {
-            content.push({
-                type: "image_url",
-                image_url: { url: `data:${media.mimetype};base64,${media.buffer.toString('base64')}` }
+            const content = [{ type: "text", text: text || "Analyse ce média." }];
+            if (media) {
+                content.push({
+                    type: "image_url",
+                    image_url: { url: `data:${media.mimetype};base64,${media.buffer.toString('base64')}` }
+                });
+            }
+
+            const messages = [
+                { role: "system", content: this.systemPrompt },
+                ...chatHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.text
+                })),
+                { role: "user", content: content }
+            ];
+
+            const completion = await this.githubClient.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: messages,
+                max_tokens: 512,
+                temperature: 0.8
             });
+
+            return completion.choices[0]?.message?.content || "";
         }
-
-        const messages = [
-            { role: "system", content: this.systemPrompt },
-            ...chatHistory.map(msg => ({
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.text
-            })),
-            { role: "user", content: content }
-        ];
-
-        const completion = await this.githubClient.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: messages,
-            max_tokens: 512,
-            temperature: 0.8
-        });
-
-        return completion.choices[0]?.message?.content || "";
-    }
 
     async processGroq(text, chatHistory) {
-        const messages = [
-            { role: "system", content: this.systemPrompt },
-            ...chatHistory.map(msg => ({
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.text
-            })),
-            { role: "user", content: text }
-        ];
+            const messages = [
+                { role: "system", content: this.systemPrompt },
+                ...chatHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.text
+                })),
+                { role: "user", content: text }
+            ];
 
-        const completion = await this.groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile",
-            messages: messages,
-            max_tokens: 512,
-            temperature: 0.8
-        });
-
-        return completion.choices[0]?.message?.content || "";
-    }
-
-    async processCohere(text, chatHistory) {
-        const chat_history = chatHistory.map(msg => ({
-            role: msg.role === 'user' ? 'USER' : 'CHATBOT',
-            message: msg.text
-        }));
-
-        const response = await this.cohere.chat({
-            message: text,
-            model: 'command-r-plus',
-            preamble: this.systemPrompt,
-            chatHistory: chat_history
-        });
-
-        return response.text;
-    }
-
-    async processDeepSeek(text, chatHistory) {
-        const messages = [
-            { role: "system", content: this.systemPrompt },
-            ...chatHistory.map(msg => ({
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.text
-            })),
-            { role: "user", content: text }
-        ];
-
-        const completion = await this.hfClient.chat.completions.create({
-            model: "deepseek-ai/DeepSeek-V3",
-            messages: messages,
-            max_tokens: 500,
-            temperature: 0.7
-        });
-
-        return completion.choices[0].message.content;
-    }
-
-    async processGemini(text, chatHistory, media = null) {
-        const parts = [{ text: text || "Analyse ce média." }];
-        if (media) {
-            parts.push({
-                inlineData: {
-                    data: media.buffer.toString('base64'),
-                    mimeType: media.mimetype
-                }
+            const completion = await this.groq.chat.completions.create({
+                model: "llama-3.3-70b-versatile",
+                messages: messages,
+                max_tokens: 512,
+                temperature: 0.8
             });
+
+            return completion.choices[0]?.message?.content || "";
         }
 
-        const contents = chatHistory.map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text }]
-        }));
+    async processCohere(text, chatHistory) {
+            const chat_history = chatHistory.map(msg => ({
+                role: msg.role === 'user' ? 'USER' : 'CHATBOT',
+                message: msg.text
+            }));
 
-        contents.push({ role: "user", parts: parts });
+            const response = await this.cohere.chat({
+                message: text,
+                model: 'command-r-plus',
+                preamble: this.systemPrompt,
+                chatHistory: chat_history
+            });
 
-        const result = await this.geminiModel.generateContent({
-            contents: contents,
-            generationConfig: { maxOutputTokens: 512, temperature: 0.9 }
-        });
+            return response.text;
+        }
 
-        return result.response.text();
+    async processDeepSeek(text, chatHistory) {
+            const messages = [
+                { role: "system", content: this.systemPrompt },
+                ...chatHistory.map(msg => ({
+                    role: msg.role === 'user' ? 'user' : 'assistant',
+                    content: msg.text
+                })),
+                { role: "user", content: text }
+            ];
+
+            const completion = await this.hfClient.chat.completions.create({
+                model: "deepseek-ai/DeepSeek-V3",
+                messages: messages,
+                max_tokens: 500,
+                temperature: 0.7
+            });
+
+            return completion.choices[0].message.content;
+        }
+
+    async processGemini(text, chatHistory, media = null) {
+            const parts = [{ text: text || "Analyse ce média." }];
+            if (media) {
+                parts.push({
+                    inlineData: {
+                        data: media.buffer.toString('base64'),
+                        mimeType: media.mimetype
+                    }
+                });
+            }
+
+            const contents = chatHistory.map(msg => ({
+                role: msg.role === 'user' ? 'user' : 'model',
+                parts: [{ text: msg.text }]
+            }));
+
+            contents.push({ role: "user", parts: parts });
+
+            const result = await this.geminiModel.generateContent({
+                contents: contents,
+                generationConfig: { maxOutputTokens: 512, temperature: 0.9 }
+            });
+
+            return result.response.text();
+        }
     }
-}
 
 module.exports = new PsychoBrain();
