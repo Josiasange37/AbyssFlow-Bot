@@ -55,20 +55,32 @@ class LinkHandler {
         try {
             await bot.sendMessage(chatId, { text: "🎬 Vidéo détectée ! Je prépare le téléchargement mola... ⏳" }, { quoted: message });
 
+            // 1. Resolve short links (vm.tiktok.com, etc.)
+            let finalUrl = url;
+            try {
+                const headRes = await axios.head(url, {
+                    maxRedirects: 5,
+                    timeout: 5000,
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
+                finalUrl = headRes.request?.res?.responseUrl || headRes.headers?.location || url;
+                if (finalUrl !== url) log.debug(`Link expanded: ${url} -> ${finalUrl}`);
+            } catch (e) {
+                log.debug(`Link expansion failed: ${e.message}`);
+            }
+
             // Brute Force API list - including specialized scrapers
             const apis = [
-                { url: `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(url)}`, type: 'general' },
-                { url: `https://api.vreden.my.id/api/tiktok?url=${encodeURIComponent(url)}`, type: 'tiktok' },
-                { url: `https://api.agatz.xyz/api/tiktok?url=${encodeURIComponent(url)}`, type: 'tiktok' },
-                { url: `https://api.agatz.xyz/api/instagram?url=${encodeURIComponent(url)}`, type: 'instagram' },
-                { url: `https://api.agatz.xyz/api/youtube?url=${encodeURIComponent(url)}`, type: 'youtube' },
-                { url: `https://api.botcahx.eu.org/api/dowloader/tiktok?url=${encodeURIComponent(url)}&apikey=PsychoBot`, type: 'tiktok' },
-                { url: `https://api.botcahx.eu.org/api/dowloader/instadl?url=${encodeURIComponent(url)}&apikey=PsychoBot`, type: 'instagram' },
-                { url: `https://bk9.site/download/tiktok?url=${encodeURIComponent(url)}`, type: 'tiktok' },
-                { url: `https://bk9.site/download/instagram?url=${encodeURIComponent(url)}`, type: 'instagram' },
-                { url: `https://api.maher-zubair.tech/download/tiktok?url=${encodeURIComponent(url)}`, type: 'tiktok' },
-                { url: `https://api.maher-zubair.tech/download/instagram?url=${encodeURIComponent(url)}`, type: 'instagram' },
-                { url: `https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(url)}`, type: 'tiktok' } // Last resort specialized
+                { url: `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}&hd=1`, type: 'tiktok' },
+                { url: `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(finalUrl)}`, type: 'general' },
+                { url: `https://api.vreden.my.id/api/tiktok?url=${encodeURIComponent(finalUrl)}`, type: 'tiktok' },
+                { url: `https://api.agatz.xyz/api/tiktok?url=${encodeURIComponent(finalUrl)}`, type: 'tiktok' },
+                { url: `https://api.agatz.xyz/api/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
+                { url: `https://api.botcahx.eu.org/api/dowloader/tiktok?url=${encodeURIComponent(finalUrl)}&apikey=PsychoBot`, type: 'tiktok' },
+                { url: `https://bk9.site/download/tiktok?url=${encodeURIComponent(finalUrl)}`, type: 'tiktok' },
+                { url: `https://bk9.site/download/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
+                { url: `https://api.maher-zubair.tech/download/tiktok?url=${encodeURIComponent(finalUrl)}`, type: 'tiktok' },
+                { url: `https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(finalUrl)}`, type: 'tiktok' }
             ];
 
             let downloadUrl = null;
@@ -76,14 +88,19 @@ class LinkHandler {
 
             for (const api of apis) {
                 // If it's a specific API and doesn't match the platform, skip to save time
-                if (api.type !== 'general' && !url.includes(api.type)) continue;
+                if (api.type !== 'general' && !finalUrl.includes(api.type)) continue;
 
                 try {
-                    const response = await axios.get(api.url, { timeout: 12000 });
+                    const response = await axios.get(api.url, {
+                        timeout: 15000,
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        }
+                    });
                     const res = response.data;
 
                     // Ultra-aggressive parsing for different API formats
-                    downloadUrl = res.result?.url || res.result?.video || res.result?.hd || res.result?.nowatermark ||
+                    downloadUrl = res.data?.play || res.data?.hdplay || res.result?.url || res.result?.video || res.result?.hd || res.result?.nowatermark ||
                         res.data?.url || res.data?.video || res.data?.nowm ||
                         res.result?.data?.find(d => d.type === 'video')?.url ||
                         res.result?.data?.[0]?.url ||
@@ -123,8 +140,8 @@ class LinkHandler {
             }
         } catch (error) {
             log.error(`Video download failed for ${url}: ${error.message}`);
-            // If it's a timeout or axios error, give more specific feedback
-            const isTimeout = error.code === 'ECONNABORTED';
+
+            const isTimeout = error.code === 'ECONNABORTED' || error.message.includes('timeout');
             const errorMsg = isTimeout
                 ? "Désolé bg, la connexion au serveur de téléchargement a expiré. ⏳ Réessaie dans quelques instants !"
                 : "Désolé bg, j'arrive pas à graille cette vidéo. Elle est peut-être privée ou le lien est mort. 💀";
