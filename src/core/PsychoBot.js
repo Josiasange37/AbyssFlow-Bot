@@ -730,8 +730,10 @@ class PsychoBot {
     // Link Detection (Auto-Banner & Video Download)
     const urlPattern = /https?:\/\/[^\s]+/;
     if (text && urlPattern.test(text) && !message.key.fromMe) {
+      const linkStart = Date.now();
       const handled = await LinkHandler.handle(this.sock, chatId, text, message);
-      if (handled) return; // Stop if link was handled
+      log.info(`🔗 Link handling took ${Date.now() - linkStart}ms`);
+      if (handled) return;
     }
 
     // --- GLOBAL AWARENESS: Log every message into history (only if not fromMe and not triggered) ---
