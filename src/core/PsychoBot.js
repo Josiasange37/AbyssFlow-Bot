@@ -10,6 +10,7 @@ const fs = require('fs-extra');
 const https = require('https');
 const path = require('path');
 const sharp = require('sharp');
+const axios = require('axios');
 const { CONFIG, THEMES, COLORS } = require('../config');
 const pino = require('pino');
 const cron = require('node-cron');
@@ -408,15 +409,73 @@ class PsychoBot {
 
       await sleep(1000);
 
-      // Try to get group profile pic
-      let ppUrl;
-      try { ppUrl = await this.sock.profilePictureUrl(groupId, 'image'); } catch { }
+      // --- XYBER-ELITE WELCOME BANNER ---
+      let welcomeBanner;
+      try {
+        // Get user PFP
+        let userPpUrl;
+        try { userPpUrl = await this.sock.profilePictureUrl(participant, 'image'); } catch { }
 
-      if (ppUrl) {
-        await this.sendMessage(groupId, { image: { url: ppUrl }, caption: message, mentions: [participant] });
-      } else {
-        await this.sendMessage(groupId, { text: message, mentions: [participant] });
+        if (userPpUrl) {
+          const ppResponse = await axios.get(userPpUrl, { responseType: 'arraybuffer' });
+          const ppBuffer = Buffer.from(ppResponse.data);
+
+          // Create a nice banner using sharp
+          const width = 800;
+          const height = 400;
+
+          const svgBanner = `
+              <svg width="${width}" height="${height}">
+                <defs>
+                  <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+                  </linearGradient>
+                  <mask id="circleMask">
+                    <circle cx="150" cy="200" r="100" fill="white" />
+                  </mask>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grad)" />
+                <circle cx="150" cy="200" r="105" fill="#e94560" />
+                <text x="300" y="180" font-family="Arial" font-size="40" fill="#e94560" font-weight="bold">BIENVENUE MOLA !</text>
+                <text x="300" y="240" font-family="Arial" font-size="30" fill="white">${groupName.substring(0, 25)}</text>
+                <text x="300" y="290" font-family="Arial" font-size="20" fill="#aaa">@${participant.split('@')[0]}</text>
+              </svg>`;
+
+          const circlePp = await sharp(ppBuffer)
+            .resize(200, 200)
+            .composite([{
+              input: Buffer.from('<svg><circle cx="100" cy="100" r="100" /></svg>'),
+              blend: 'dest-in'
+            }])
+            .png()
+            .toBuffer();
+
+          welcomeBanner = await sharp(Buffer.from(svgBanner))
+            .composite([{ input: circlePp, top: 100, left: 50 }])
+            .png()
+            .toBuffer();
+        }
+      } catch (err) {
+        log.debug('Failed to generate welcome banner:', err.message);
       }
+
+      const messageContent = {
+        text: message,
+        mentions: [participant]
+      };
+
+      if (welcomeBanner) {
+        messageContent.image = welcomeBanner;
+        messageContent.caption = message;
+        delete messageContent.text;
+      } else if (ppUrl) {
+        messageContent.image = { url: ppUrl };
+        messageContent.caption = message;
+        delete messageContent.text;
+      }
+
+      await this.sendMessage(groupId, messageContent);
 
       log.info(`Smart welcome sent to ${participant} in ${groupId}`);
     } catch (error) {
@@ -607,7 +666,7 @@ class PsychoBot {
           `📝 *Nouveau message:*`,
           `"${newText}"`,
           '',
-          `🌊 _Détecté par le Water Hashira_`
+          `⚡ _Psycho Bo a tout vu mola ! ⚔️_`
         ].join('\n'),
         mentions: [sender]
       });
@@ -629,14 +688,12 @@ class PsychoBot {
         // Text message
         await this.sendMessage(chatId, {
           text: [
-            `🗑️ *Message Supprimé*`,
+            `👀 *Tiens tiens, t'as essayé de cacher ça ?*`,
             '',
             `👤 *Utilisateur:* ${senderName}`,
+            `📝 *Message:* "${cachedMessage.text}"`,
             '',
-            `📝 *Message supprimé:*`,
-            `"${cachedMessage.text}"`,
-            '',
-            `🌊 _Détecté par le Water Hashira_`
+            `⚡ _Psycho Bo a tout vu mola ! ⚔️_`
           ].join('\n'),
           mentions: [cachedMessage.sender]
         });
