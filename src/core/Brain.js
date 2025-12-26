@@ -19,6 +19,7 @@ class PsychoBrain {
         this.mistral = null;
         this.historyDir = path.join(__dirname, '..', 'data', 'history');
         this.maxHistory = 20;
+        this.maxMemoryChats = 100; // Limit number of chats stored in RAM
         this.memoryHistory = new Map(); // In-memory cache for chat history
         this.isInitialized = false;
 
@@ -159,11 +160,21 @@ class PsychoBrain {
         return [];
     }
 
+    pruneCache() {
+        if (this.memoryHistory.size > this.maxMemoryChats) {
+            const firstKey = this.memoryHistory.keys().next().value;
+            this.memoryHistory.delete(firstKey);
+            log.debug(`Brain: Pruned oldest chat from memory (${firstKey})`);
+        }
+    }
+
     async saveHistory(chatId, history) {
         const limitedHistory = history.slice(-50);
 
         // 1. UPDATE MEMORY CACHE
+        this.memoryHistory.delete(chatId); // Move to the end (LRU)
         this.memoryHistory.set(chatId, limitedHistory);
+        this.pruneCache();
 
         // 2. MONGO DB PERSISTENCE (Async, don't wait)
         const History = require('../database/models/History');
