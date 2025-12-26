@@ -19,7 +19,7 @@ module.exports = {
                 participants.map(jid => `@${jid.split('@')[0]}`).join(' ')
             ].join('\n');
 
-            await sock.sendMessage(chatId, {
+            await bot.sendMessage(chatId, {
                 text: tagMessage,
                 mentions: participants
             });

@@ -15,7 +15,7 @@ module.exports = {
 
             const buffer = await bot.downloadMedia(stickerMessage);
 
-            await sock.sendMessage(chatId, {
+            await bot.sendMessage(chatId, {
                 image: buffer,
                 caption: `Tiens bg ! ✨`
             }, { quoted: message });

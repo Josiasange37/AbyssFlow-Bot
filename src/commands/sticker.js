@@ -15,7 +15,7 @@ module.exports = {
 
             const buffer = await bot.downloadMedia(mediaMessage);
 
-            await sock.sendMessage(chatId, {
+            await bot.sendMessage(chatId, {
                 sticker: buffer
             }, { quoted: message });
 

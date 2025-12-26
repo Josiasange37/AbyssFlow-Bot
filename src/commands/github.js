@@ -16,7 +16,7 @@ module.exports = {
                 `🔗 Link: ${data.html_url}`
             ].join('\n');
 
-            await bot.sock.sendMessage(chatId, { image: { url: data.avatar_url }, caption: text });
+            await bot.sendMessage(chatId, { image: { url: data.avatar_url }, caption: text });
         } catch (error) {
             await bot.sendSafeMessage(chatId, `pas trouvé cet utilisateur :/`);
         }

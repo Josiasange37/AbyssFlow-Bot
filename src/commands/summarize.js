@@ -8,12 +8,12 @@ module.exports = {
     description: 'Résume les dernières discussions du groupe.',
     execute: async ({ sock, chatId, message }) => {
         try {
-            await sock.sendMessage(chatId, { text: "Attends mola, je relis vos bêtises pour vous faire un topo... 📖✍️" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "Attends mola, je relis vos bêtises pour vous faire un topo... 📖✍️" }, { quoted: message });
 
             const history = await Brain.getHistory(chatId);
 
             if (history.length < 5) {
-                return await sock.sendMessage(chatId, { text: "Y'a pas assez de messages pour résumer là. On dirait un désert ici... 🌵" }, { quoted: message });
+                return await bot.sendMessage(chatId, { text: "Y'a pas assez de messages pour résumer là. On dirait un désert ici... 🌵" }, { quoted: message });
             }
 
             // Prepare the context for the AI
@@ -32,14 +32,14 @@ module.exports = {
             const summary = await Brain.process(summaryPrompt, chatId);
 
             if (summary) {
-                await sock.sendMessage(chatId, { text: `📝 *RÉSUMÉ DU FLOW* 📝\n\n${summary}` }, { quoted: message });
+                await bot.sendMessage(chatId, { text: `📝 *RÉSUMÉ DU FLOW* 📝\n\n${summary}` }, { quoted: message });
             } else {
-                await sock.sendMessage(chatId, { text: "J'ai essayé de résumer mais mon cerveau a buggé. Trop de bruits pour rien dans ce groupe ! 😵‍💫" }, { quoted: message });
+                await bot.sendMessage(chatId, { text: "J'ai essayé de résumer mais mon cerveau a buggé. Trop de bruits pour rien dans ce groupe ! 😵‍💫" }, { quoted: message });
             }
 
         } catch (error) {
             log.error('Summarize Command Error:', error.message);
-            await sock.sendMessage(chatId, { text: "Impossible de résumer pour l'instant. Le ndem est total. 💀" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "Impossible de résumer pour l'instant. Le ndem est total. 💀" }, { quoted: message });
         }
     }
 };

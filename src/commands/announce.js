@@ -27,7 +27,7 @@ module.exports = {
                     await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
 
                     await simulateTyping(sock, group.id, 1000);
-                    await sock.sendMessage(group.id, { text: `📢 *ANNONCE OFFICIELLE*\n\n${text}` });
+                    await bot.sendMessage(group.id, { text: `📢 *ANNONCE OFFICIELLE*\n\n${text}` });
                     sent++;
 
                     if (sent % 10 === 0) {

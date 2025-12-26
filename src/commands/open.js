@@ -7,7 +7,7 @@ module.exports = {
     async execute({ sock, chatId, message, bot }) {
         try {
             await sock.groupSettingUpdate(chatId, 'not_announcement');
-            await sock.sendMessage(chatId, {
+            await bot.sendMessage(chatId, {
                 text: `🔓 C'est ouvert la mif !\nTout le monde peut parler maintenant.`,
                 quoted: message
             });

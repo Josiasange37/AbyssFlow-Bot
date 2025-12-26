@@ -53,7 +53,7 @@ module.exports = {
 
             if (added.length > 0) {
                 const addedList = added.map(jid => `• @${jid.split('@')[0]}`).join('\n');
-                await sock.sendMessage(chatId, {
+                await bot.sendMessage(chatId, {
                     text: `Bienvenue dans la mif! 👋\n${addedList}`,
                     mentions: added
                 });
@@ -66,7 +66,7 @@ module.exports = {
 
                 for (const f of failed) {
                     if (f.status == 403) {
-                        await sock.sendMessage(f.jid, { text: `Salut! Je peux pas t'ajouter direct au groupe, tiens le lien: ${inviteLink}` });
+                        await bot.sendMessage(f.jid, { text: `Salut! Je peux pas t'ajouter direct au groupe, tiens le lien: ${inviteLink}` });
                         invitesSent++;
                     }
                 }

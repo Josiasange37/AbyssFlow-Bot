@@ -11,11 +11,20 @@ require('dotenv').config();
 
 // Handle uncaught exceptions and unhandled rejections
 process.on('uncaughtException', (error) => {
+  // Ignore "Connection Closed" errors from Baileys, as they are handled internally
+  if (error?.message === 'Connection Closed') {
+    log.warn('Caught expected Connection Closed error. Bot will attempt reconnection.');
+    return;
+  }
   log.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
+  if (reason?.message === 'Connection Closed') {
+    log.warn('Caught expected Connection Closed rejection. Bot will attempt reconnection.');
+    return;
+  }
   log.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });

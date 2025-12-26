@@ -43,7 +43,7 @@ module.exports = {
         helpText.push('');
         helpText.push(`hésite pas si t'as besoin d'aide 🤝`);
 
-        await sock.sendMessage(chatId, {
+        await bot.sendMessage(chatId, {
             text: helpText.join('\n'),
             mentions: [message.key.participant || message.key.remoteJid]
         }, { quoted: message });

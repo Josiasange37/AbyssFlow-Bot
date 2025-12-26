@@ -9,10 +9,10 @@ module.exports = {
     description: 'Cherche un truc sur Google.',
     execute: async ({ sock, chatId, message, args }) => {
         const query = args.join(' ');
-        if (!query) return await sock.sendMessage(chatId, { text: "Dis-moi ce que tu cherches bg ! 🧐" }, { quoted: message });
+        if (!query) return await bot.sendMessage(chatId, { text: "Dis-moi ce que tu cherches bg ! 🧐" }, { quoted: message });
 
         try {
-            await sock.sendMessage(chatId, { text: "Attends mola, je fouille le web... 🔍🕸️" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "Attends mola, je fouille le web... 🔍🕸️" }, { quoted: message });
 
             // Use SerpApi if key is available, else fallback to a public search or informative message
             if (CONFIG.searchApiKey) {
@@ -31,16 +31,16 @@ module.exports = {
                     results.slice(0, 3).forEach((res, i) => {
                         text += `${i + 1}. *${res.title}*\n${res.snippet}\n🔗 _${res.link}_\n\n`;
                     });
-                    return await sock.sendMessage(chatId, { text }, { quoted: message });
+                    return await bot.sendMessage(chatId, { text }, { quoted: message });
                 }
             }
 
             // Fallback if no key or no results
-            await sock.sendMessage(chatId, { text: "J'ai rien trouvé de probant mola. T'as pas une question plus facile ? 🤨" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "J'ai rien trouvé de probant mola. T'as pas une question plus facile ? 🤨" }, { quoted: message });
 
         } catch (error) {
             log.error('Google Search Error:', error.message);
-            await sock.sendMessage(chatId, { text: "Le web est trop sombre aujourd'hui, j'arrive pas à chercher. 💀" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "Le web est trop sombre aujourd'hui, j'arrive pas à chercher. 💀" }, { quoted: message });
         }
     }
 };
