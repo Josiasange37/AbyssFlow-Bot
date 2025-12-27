@@ -29,7 +29,7 @@ export default function AdminDashboard() {
         setLoading(true)
         try {
             const token = localStorage.getItem('auth-token')
-            const response = await fetch('http://localhost:3001/api/admin/sessions', {
+            const response = await fetch(`${process.env.BOT_API_URL}/api/admin/sessions`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             const data = await response.json()
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
         if (!confirm(`Are you sure you want to stop session ${id}?`)) return
         try {
             const token = localStorage.getItem('auth-token')
-            await fetch(`http://localhost:3001/api/sessions/${id}`, {
+            await fetch(`${process.env.BOT_API_URL}/api/sessions/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
@@ -145,8 +145,8 @@ export default function AdminDashboard() {
                                     <td className="px-6 py-4 font-mono text-sm">{session.id}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${session.status === 'CONNECTED'
-                                                ? 'bg-green-500/20 text-green-500'
-                                                : 'bg-yellow-500/20 text-yellow-500'
+                                            ? 'bg-green-500/20 text-green-500'
+                                            : 'bg-yellow-500/20 text-yellow-500'
                                             }`}>
                                             {session.status}
                                         </span>

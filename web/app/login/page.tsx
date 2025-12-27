@@ -37,6 +37,7 @@ export default function LoginPage() {
     password: '',
     phone: '',
     name: '',
+    botName: '',
     plan: 'free'
   })
 
@@ -56,7 +57,7 @@ export default function LoginPage() {
       if (!token) return
 
       try {
-        const response = await fetch('http://localhost:3001/api/payment/status', {
+        const response = await fetch(`${process.env.BOT_API_URL}/api/payment/status`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         const data = await response.json()
@@ -77,7 +78,7 @@ export default function LoginPage() {
 
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
-      const response = await fetch(`http://localhost:3001${endpoint}`, {
+      const response = await fetch(`${process.env.BOT_API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mode === 'login' ? {
@@ -129,7 +130,7 @@ export default function LoginPage() {
         return
       }
 
-      const response = await fetch('http://localhost:3001/api/bot/qr', {
+      const response = await fetch(`${process.env.BOT_API_URL}/api/bot/qr`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,8 +191,8 @@ export default function LoginPage() {
           <button
             onClick={() => setMode('login')}
             className={`flex-1 py-2 rounded-md transition ${mode === 'login'
-                ? 'bg-primary-600 text-white'
-                : 'text-gray-400 hover:text-white'
+              ? 'bg-primary-600 text-white'
+              : 'text-gray-400 hover:text-white'
               }`}
           >
             Connexion
@@ -199,8 +200,8 @@ export default function LoginPage() {
           <button
             onClick={() => setMode('register')}
             className={`flex-1 py-2 rounded-md transition ${mode === 'register'
-                ? 'bg-primary-600 text-white'
-                : 'text-gray-400 hover:text-white'
+              ? 'bg-primary-600 text-white'
+              : 'text-gray-400 hover:text-white'
               }`}
           >
             Inscription
@@ -212,8 +213,8 @@ export default function LoginPage() {
           <button
             onClick={() => setMethod('qr')}
             className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${method === 'qr'
-                ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-white'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white'
               }`}
           >
             <QrCode className="w-4 h-4" />
@@ -222,8 +223,8 @@ export default function LoginPage() {
           <button
             onClick={() => setMethod('phone')}
             className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${method === 'phone'
-                ? 'bg-purple-600 text-white'
-                : 'text-gray-400 hover:text-white'
+              ? 'bg-purple-600 text-white'
+              : 'text-gray-400 hover:text-white'
               }`}
           >
             <Phone className="w-4 h-4" />
@@ -369,6 +370,16 @@ export default function LoginPage() {
                         required
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Nom de ton Bot (Optionnel)</label>
+                    <input
+                      type="text"
+                      value={formData.botName}
+                      onChange={(e) => setFormData({ ...formData, botName: e.target.value })}
+                      className="w-full px-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
+                      placeholder="Ex: Psycho Master"
+                    />
                   </div>
                 </>
               )}
