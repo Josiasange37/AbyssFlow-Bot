@@ -5,9 +5,9 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AbyssFlow - Professional WhatsApp Bot Dashboard',
-  description: 'Manage your WhatsApp bot with style and efficiency. Water Hashira powered.',
-  keywords: 'WhatsApp bot, dashboard, automation, AbyssFlow, Water Hashira',
+  title: 'Psycho Bot - Professional WhatsApp Bot Dashboard',
+  description: 'Manage your WhatsApp bot with style and efficiency. Psycho Bot powered.',
+  keywords: 'WhatsApp bot, dashboard, automation, Psycho Bot, Water Hashira',
 }
 
 export default function RootLayout({

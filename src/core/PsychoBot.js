@@ -1,45 +1,11 @@
-const {
-  makeWASocket,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  DisconnectReason,
-  downloadMediaMessage,
-} = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
-const fs = require('fs-extra');
-const https = require('https');
-const path = require('path');
-const sharp = require('sharp');
-const axios = require('axios');
-const { CONFIG, THEMES, COLORS } = require('../config');
-const pino = require('pino');
-const cron = require('node-cron');
-const UserStats = require('../database/models/UserStats');
-const Warning = require('../database/models/Warning');
-const GroupSettings = require('../database/models/GroupSettings');
-const { log, LOG_LEVEL_MAP, LOG_THRESHOLD } = require('../utils/logger');
+const EventEmitter = require('events');
 
-// Create a filtered pino logger for Baileys
-const baileysLogger = pino({ level: 'silent' });
-const {
-  sleep,
-  normalizeNumber,
-  simulateTyping,
-  calculateTypingDuration,
-  withTimeout
-} = require('../utils/helpers');
-const { connectDB } = require('../database');
-const LinkHandler = require('../utils/LinkHandler');
-const Brain = require('./Brain');
-const useMongoAuthState = require('./mongoAuth');
-
-// Constants used in class
-const GITHUB_CACHE_TTL_MS = CONFIG.GITHUB_CACHE_TTL_MS;
-const RATE_WINDOW_MS = CONFIG.RATE_WINDOW_MS;
-
-class PsychoBot {
-  constructor() {
+class PsychoBot extends EventEmitter {
+  constructor(sessionId = 'psycho-bot') {
+    super();
+    this.sessionId = sessionId;
     this.sock = null;
+    this.status = 'INITIALIZING';
     this.commands = new Map();
     this.commandHistory = new Map();
     this.reconnectDelay = CONFIG.reconnectBase;
@@ -50,7 +16,7 @@ class PsychoBot {
     };
     this.commandCount = 0;
     this.githubCache = { data: null, fetchedAt: 0 };
-    this.groupsDataPath = path.join(__dirname, 'data', 'groups.json');
+    this.groupsDataPath = path.join(__dirname, '..', 'data', `groups_${this.sessionId}.json`);
     this.groupSettings = this.loadGroupSettings();
 
     // Message cache for tracking edits and deletions (max 1000 messages)
@@ -59,16 +25,12 @@ class PsychoBot {
     this.metadataCache = new Map(); // Cache for group participants
 
     if (!CONFIG.owners.length) {
-      log.warn('No owners configured. Set BOT_OWNERS in .env');
-    } else {
-      log.info(`Owners: ${CONFIG.owners.join(', ')}`);
+      log.warn(`[${this.sessionId}] No owners configured.`);
     }
 
-    // Load available command plugins
     this.loadCommands();
-
-    // Initialize Database (Async)
-    connectDB().catch(e => log.error('DB Init Error:', e.message));
+    // Use session-scoped DB connection if needed or share the global one
+    connectDB().catch(e => log.error(`[${this.sessionId}] DB Init Error:`, e.message));
   }
 
   loadGroupSettings() {
@@ -154,15 +116,15 @@ class PsychoBot {
 
       let state, saveCreds;
       if (CONFIG.mongoUri) {
-        log.info('Using MongoDB for session storage 🔌');
-        const mongoAuth = await useMongoAuthState('psycho-bot');
+        log.info(`[${this.sessionId}] Using MongoDB for session storage 🔌`);
+        const mongoAuth = await useMongoAuthState(this.sessionId);
         state = mongoAuth.state;
         saveCreds = mongoAuth.saveCreds;
       } else {
-        log.warn('⚠️ MONGO_URI is not set in environment. Falling back to local files.');
-        log.info('Using local file system for session storage 📁');
-        await fs.ensureDir(path.resolve(CONFIG.sessionPath));
-        ({ state, saveCreds } = await useMultiFileAuthState(CONFIG.sessionPath));
+        log.warn(`[${this.sessionId}] ⚠️ MONGO_URI is not set. Falling back to local files.`);
+        const sessionFolder = path.join(CONFIG.sessionPath, this.sessionId);
+        await fs.ensureDir(path.resolve(sessionFolder));
+        ({ state, saveCreds } = await useMultiFileAuthState(sessionFolder));
       }
 
       let version;
@@ -201,7 +163,11 @@ class PsychoBot {
       }
 
       this.sock.ev.on('creds.update', saveCreds);
-      this.sock.ev.on('connection.update', (update) => this.onConnection(update));
+      this.sock.ev.on('connection.update', (update) => {
+        this.status = update.connection?.toUpperCase() || this.status;
+        this.emit('connection.update', update);
+        this.onConnection(update);
+      });
       this.sock.ev.on('messages.upsert', (payload) => this.onMessages(payload));
       this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
@@ -227,23 +193,28 @@ class PsychoBot {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      log.info('QR code generated. Scan with WhatsApp quickly.');
+      this.status = 'QR_READY';
+      this.qrCode = qr;
+      log.info(`[${this.sessionId}] QR code generated.`);
       qrcode.generate(qr, { small: true });
     }
 
     if (connection === 'connecting') {
-      log.info('connexion en cours...');
+      this.status = 'CONNECTING';
+      log.info(`[${this.sessionId}] connexion en cours...`);
       return;
     }
 
     if (connection === 'open') {
+      this.status = 'CONNECTED';
       this.reconnectDelay = CONFIG.reconnectBase;
-      log.info('on est en ligne les gars!');
+      log.info(`[${this.sessionId}] on est en ligne les gars!`);
       return;
     }
 
     if (connection === 'close') {
-      this.sock = null; // Important: Nullify to prevent usage while closed
+      this.status = 'OFFLINE';
+      this.sock = null;
       const statusCode =
         lastDisconnect?.error?.output?.statusCode ??
         lastDisconnect?.error?.statusCode ??

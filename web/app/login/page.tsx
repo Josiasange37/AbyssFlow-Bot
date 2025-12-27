@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useSearchParams } from 'next/navigation'
-import { 
-  Droplets, 
-  Mail, 
-  Lock, 
-  Phone, 
+import {
+  Droplets,
+  Mail,
+  Lock,
+  Phone,
   QrCode,
   ArrowLeft,
   Eye,
@@ -28,10 +28,10 @@ export default function LoginPage() {
   const [method, setMethod] = useState<'qr' | 'phone'>('qr')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [qrCode, setQrCode] = useState('abyssflow://connect?session=demo123')
+  const [qrCode, setQrCode] = useState('psychobot://connect?session=demo123')
   const [hasPayment, setHasPayment] = useState(false)
   const [userPlan, setUserPlan] = useState('free')
-  
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -54,14 +54,14 @@ export default function LoginPage() {
     const checkPayment = async () => {
       const token = localStorage.getItem('auth-token')
       if (!token) return
-      
+
       try {
         const response = await fetch('http://localhost:3001/api/payment/status', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         const data = await response.json()
         setHasPayment(data.hasPayment)
-        
+
         const user = JSON.parse(localStorage.getItem('user') || '{}')
         setUserPlan(user.plan || 'free')
       } catch (error) {
@@ -74,7 +74,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
+
     try {
       const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
       const response = await fetch(`http://localhost:3001${endpoint}`, {
@@ -91,17 +91,17 @@ export default function LoginPage() {
           plan: formData.plan
         })
       })
-      
+
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Authentication failed')
       }
-      
+
       // Save token and user data
       localStorage.setItem('auth-token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
-      
+
       // Check if user has payment
       if (!data.user.hasPayment && data.user.plan === 'free') {
         alert('Compte créé! Vous devez choisir un plan payant pour accéder au bot.')
@@ -119,16 +119,16 @@ export default function LoginPage() {
 
   const handleQRConnect = async () => {
     setLoading(true)
-    
+
     try {
       const token = localStorage.getItem('auth-token')
-      
+
       if (!token) {
         alert('Vous devez être connecté pour générer un QR Code')
         setLoading(false)
         return
       }
-      
+
       const response = await fetch('http://localhost:3001/api/bot/qr', {
         method: 'POST',
         headers: {
@@ -136,9 +136,9 @@ export default function LoginPage() {
           'Authorization': `Bearer ${token}`
         }
       })
-      
+
       const data = await response.json()
-      
+
       if (!response.ok) {
         if (response.status === 403) {
           alert('Paiement requis! Vous devez avoir un plan actif pour accéder au bot.')
@@ -147,7 +147,7 @@ export default function LoginPage() {
         }
         throw new Error(data.error || 'Failed to generate QR code')
       }
-      
+
       setQrCode(data.qrCode)
     } catch (error: any) {
       alert(error.message || 'Erreur lors de la génération du QR Code')
@@ -165,7 +165,7 @@ export default function LoginPage() {
       </div>
 
       {/* Back to Home */}
-      <Link 
+      <Link
         href="/"
         className="absolute top-8 left-8 flex items-center gap-2 text-gray-400 hover:text-white transition"
       >
@@ -182,28 +182,26 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
           <Droplets className="w-10 h-10 text-primary-500" />
-          <span className="text-3xl font-bold gradient-text">AbyssFlow</span>
+          <span className="text-3xl font-bold gradient-text">Psycho Bot</span>
         </div>
 
         {/* Mode Toggle */}
         <div className="flex gap-2 mb-6 bg-dark-800 p-1 rounded-lg">
           <button
             onClick={() => setMode('login')}
-            className={`flex-1 py-2 rounded-md transition ${
-              mode === 'login' 
-                ? 'bg-primary-600 text-white' 
+            className={`flex-1 py-2 rounded-md transition ${mode === 'login'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-400 hover:text-white'
-            }`}
+              }`}
           >
             Connexion
           </button>
           <button
             onClick={() => setMode('register')}
-            className={`flex-1 py-2 rounded-md transition ${
-              mode === 'register' 
-                ? 'bg-primary-600 text-white' 
+            className={`flex-1 py-2 rounded-md transition ${mode === 'register'
+                ? 'bg-primary-600 text-white'
                 : 'text-gray-400 hover:text-white'
-            }`}
+              }`}
           >
             Inscription
           </button>
@@ -213,22 +211,20 @@ export default function LoginPage() {
         <div className="flex gap-2 mb-6 bg-dark-800 p-1 rounded-lg">
           <button
             onClick={() => setMethod('qr')}
-            className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${
-              method === 'qr' 
-                ? 'bg-purple-600 text-white' 
+            className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${method === 'qr'
+                ? 'bg-purple-600 text-white'
                 : 'text-gray-400 hover:text-white'
-            }`}
+              }`}
           >
             <QrCode className="w-4 h-4" />
             QR Code
           </button>
           <button
             onClick={() => setMethod('phone')}
-            className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${
-              method === 'phone' 
-                ? 'bg-purple-600 text-white' 
+            className={`flex-1 py-2 rounded-md transition flex items-center justify-center gap-2 ${method === 'phone'
+                ? 'bg-purple-600 text-white'
                 : 'text-gray-400 hover:text-white'
-            }`}
+              }`}
           >
             <Phone className="w-4 h-4" />
             Téléphone
@@ -248,7 +244,7 @@ export default function LoginPage() {
                 <div className="w-20 h-20 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center">
                   <Lock className="w-10 h-10 text-red-500" />
                 </div>
-                
+
                 <h3 className="text-2xl font-bold mb-3 text-red-500">Accès Restreint</h3>
                 <p className="text-gray-300 mb-6">
                   Le QR Code n'est disponible que pour les utilisateurs avec un plan actif
@@ -282,7 +278,7 @@ export default function LoginPage() {
                   >
                     Choisir un Plan Payant
                   </Link>
-                  
+
                   <p className="text-xs text-gray-500">
                     Plans disponibles: Gold ($9.99/mois) ou Pro ($24.99/mois)
                   </p>
@@ -292,14 +288,14 @@ export default function LoginPage() {
               // QR Code Display (only if payment active)
               <>
                 <div className="bg-white p-6 rounded-xl inline-block mb-4">
-                  <QRCodeSVG 
-                    value={qrCode} 
+                  <QRCodeSVG
+                    value={qrCode}
                     size={200}
                     level="H"
                     includeMargin={true}
                   />
                 </div>
-                
+
                 <h3 className="text-xl font-semibold mb-2">Scanner le QR Code</h3>
                 <p className="text-gray-400 mb-4">
                   Ouvrez WhatsApp sur votre téléphone et scannez ce code
@@ -353,7 +349,7 @@ export default function LoginPage() {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="w-full px-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
                       placeholder="Josias Almight"
                       required
@@ -367,7 +363,7 @@ export default function LoginPage() {
                       <input
                         type="tel"
                         value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         className="w-full pl-12 pr-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
                         placeholder="+237 6XX XXX XXX"
                         required
@@ -384,7 +380,7 @@ export default function LoginPage() {
                   <input
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full pl-12 pr-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
                     placeholder="vous@exemple.com"
                     required
@@ -399,7 +395,7 @@ export default function LoginPage() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full pl-12 pr-12 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
                     placeholder="••••••••"
                     required
@@ -419,7 +415,7 @@ export default function LoginPage() {
                   <label className="block text-sm font-medium mb-2">Plan</label>
                   <select
                     value={formData.plan}
-                    onChange={(e) => setFormData({...formData, plan: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
                     className="w-full px-4 py-3 bg-dark-800 border border-gray-700 rounded-lg focus:border-primary-500 focus:outline-none transition"
                   >
                     <option value="free">Free - Gratuit</option>
@@ -460,7 +456,7 @@ export default function LoginPage() {
           {mode === 'login' ? (
             <p>
               Pas encore de compte?{' '}
-              <button 
+              <button
                 onClick={() => setMode('register')}
                 className="text-primary-400 hover:text-primary-300"
               >
@@ -470,7 +466,7 @@ export default function LoginPage() {
           ) : (
             <p>
               Déjà un compte?{' '}
-              <button 
+              <button
                 onClick={() => setMode('login')}
                 className="text-primary-400 hover:text-primary-300"
               >
