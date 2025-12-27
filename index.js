@@ -7,6 +7,8 @@ const readline = require('readline');
 const fs = require('fs');
 const path = require('path');
 const { CONFIG } = require('./src/config');
+const express = require('express');
+const axios = require('axios');
 require('dotenv').config();
 
 // Handle uncaught exceptions and unhandled rejections
@@ -92,13 +94,30 @@ process.on('unhandledRejection', (reason, promise) => {
       await bot.start();
     }
 
-    // Keep-alive mechanism for Railway/Heroku
-    // Runs every 5 minutes to prevent the bot from sleeping
-    cron.schedule('*/5 * * * *', () => {
-      log.info('🔄 Keep-alive ping - Bot is active');
+    // --- RENDER ANTI-SLEEP MECHANISM ---
+    const app = express();
+    app.get('/', (req, res) => res.send('Psycho Bot is Online! 🚀'));
+    app.get('/health', (req, res) => res.status(200).send('OK'));
+
+    app.listen(CONFIG.port, () => {
+      log.info(`🚀 Keep-alive server running on port ${CONFIG.port}`);
     });
 
-    log.info('✅ Keep-alive mechanism activated');
+    // Self-pinging every 10 minutes
+    cron.schedule('*/10 * * * *', async () => {
+      try {
+        log.info('🔄 Keep-alive: Self-pinging...');
+        if (CONFIG.renderUrl) {
+          const url = CONFIG.renderUrl.endsWith('/') ? CONFIG.renderUrl : `${CONFIG.renderUrl}/`;
+          await axios.get(`${url}health`);
+          log.info('✅ Self-ping successful');
+        } else {
+          log.warn('⚠️ RENDER_URL not set. Self-ping skipped.');
+        }
+      } catch (error) {
+        log.error('❌ Keep-alive failed:', error.message);
+      }
+    });
   } catch (error) {
     log.error('Fatal error during startup:', error);
     process.exit(1);
