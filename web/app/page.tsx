@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  Droplets, 
-  MessageSquare, 
-  Shield, 
-  Zap, 
-  Users, 
+import {
+  Droplets,
+  MessageSquare,
+  Shield,
+  Zap,
+  Users,
   Check,
   ArrowRight,
   Sparkles,
@@ -113,22 +113,22 @@ export default function Home() {
       <nav className="fixed top-0 w-full z-50 glass-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <motion.div 
+            <motion.div
               className="flex items-center space-x-2"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
             >
               <Droplets className="w-8 h-8 text-primary-500" />
-              <span className="text-2xl font-bold gradient-text">AbyssFlow</span>
+              <span className="text-2xl font-bold gradient-text">Psycho Bot</span>
             </motion.div>
-            
+
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="hover:text-primary-400 transition">Fonctionnalités</a>
               <Link href="/commands" className="hover:text-primary-400 transition">Commandes</Link>
               <Link href="/plans" className="hover:text-primary-400 transition">Tarifs</Link>
               <Link href="/about" className="hover:text-primary-400 transition">À Propos</Link>
-              <Link 
-                href="/login" 
+              <Link
+                href="/login"
                 className="px-6 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg transition btn-glow"
               >
                 Connexion
@@ -152,18 +152,18 @@ export default function Home() {
               Professionnel
             </h1>
             <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Gérez vos groupes WhatsApp avec puissance et élégance. 
+              Gérez vos groupes WhatsApp avec puissance et élégance.
               Automation complète, protection anti-ban, et bien plus.
             </p>
             <div className="flex gap-4 justify-center">
-              <Link 
+              <Link
                 href="/login"
                 className="px-8 py-4 bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700 rounded-lg text-lg font-semibold flex items-center gap-2 btn-glow transition"
               >
                 Commencer Maintenant
                 <ArrowRight className="w-5 h-5" />
               </Link>
-              <a 
+              <a
                 href="#features"
                 className="px-8 py-4 border border-primary-600 hover:bg-primary-600/10 rounded-lg text-lg font-semibold transition"
               >
@@ -296,7 +296,7 @@ export default function Home() {
             <Rocket className="w-16 h-16 mx-auto mb-6 text-primary-500" />
             <h2 className="text-4xl font-bold mb-4">Prêt à Commencer?</h2>
             <p className="text-gray-400 text-lg mb-8">
-              Rejoignez des centaines d'utilisateurs qui font confiance à AbyssFlow
+              Rejoignez des centaines d'utilisateurs qui font confiance à Psycho Bot
             </p>
             <Link
               href="/login"
@@ -315,10 +315,10 @@ export default function Home() {
             <div>
               <div className="flex items-center space-x-2 mb-4">
                 <Droplets className="w-6 h-6 text-primary-500" />
-                <span className="text-xl font-bold">AbyssFlow</span>
+                <span className="text-xl font-bold">Psycho Bot</span>
               </div>
               <p className="text-gray-400">
-                WhatsApp Bot professionnel propulsé par Water Hashira
+                WhatsApp Bot professionnel propulsé par Psycho Bo
               </p>
             </div>
             <div>
@@ -347,7 +347,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 AbyssFlow by Josias Almight. All rights reserved.</p>
+            <p>&copy; 2025 Psycho Bot by Josias Almight. All rights reserved.</p>
           </div>
         </div>
       </footer>
