@@ -1,9 +1,13 @@
 const EventEmitter = require('events');
 
 class PsychoBot extends EventEmitter {
-  constructor(sessionId = 'psycho-bot') {
+  constructor(sessionId = 'psycho-bot', options = {}) {
     super();
     this.sessionId = sessionId;
+    // Prefix sessionId with DEPLOYMENT_ID if set to avoid database/session collisions
+    this.fullSessionId = process.env.DEPLOYMENT_ID ? `${process.env.DEPLOYMENT_ID}_${this.sessionId}` : this.sessionId;
+
+    this.botName = options.botName || CONFIG.botName || 'Psycho Bot';
     this.sock = null;
     this.status = 'INITIALIZING';
     this.commands = new Map();
@@ -117,12 +121,12 @@ class PsychoBot extends EventEmitter {
       let state, saveCreds;
       if (CONFIG.mongoUri) {
         log.info(`[${this.sessionId}] Using MongoDB for session storage 🔌`);
-        const mongoAuth = await useMongoAuthState(this.sessionId);
+        const mongoAuth = await useMongoAuthState(this.fullSessionId);
         state = mongoAuth.state;
         saveCreds = mongoAuth.saveCreds;
       } else {
         log.warn(`[${this.sessionId}] ⚠️ MONGO_URI is not set. Falling back to local files.`);
-        const sessionFolder = path.join(CONFIG.sessionPath, this.sessionId);
+        const sessionFolder = path.join(CONFIG.sessionPath, this.fullSessionId);
         await fs.ensureDir(path.resolve(sessionFolder));
         ({ state, saveCreds } = await useMultiFileAuthState(sessionFolder));
       }

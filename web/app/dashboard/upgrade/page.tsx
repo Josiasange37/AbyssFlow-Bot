@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { 
+import {
   Crown,
   Sparkles,
   Check,
@@ -93,59 +93,56 @@ export default function UpgradePage() {
   const [processing, setProcessing] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [loading, setLoading] = useState(true)
-  
+
   // Check authentication on mount
   useEffect(() => {
     const token = localStorage.getItem('auth-token')
-    
+
     if (!token) {
       alert('Vous devez être connecté pour choisir un plan')
       window.location.href = '/login'
       return
     }
-    
+
     setIsAuthenticated(true)
     setLoading(false)
   }, [])
-  
+
   const handleUpgrade = async (plan: string) => {
     setProcessing(true)
-    
+
     try {
       const token = localStorage.getItem('auth-token')
-      
+
       if (!token) {
         alert('Vous devez être connecté')
         window.location.href = '/login'
         return
       }
-      
-      const response = await fetch('http://localhost:3001/api/payment/create', {
+
+      const response = await fetch(`${process.env.BOT_API_URL}/api/payment/initiate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          plan,
-          paymentMethod: 'card'
-        })
+        body: JSON.stringify({ plan })
       })
-      
+
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Payment failed')
       }
-      
+
       alert(`Paiement réussi! Vous êtes maintenant sur le plan ${plan.toUpperCase()}`)
-      
+
       // Update local storage
       const user = JSON.parse(localStorage.getItem('user') || '{}')
       user.plan = plan
       user.hasPayment = true
       localStorage.setItem('user', JSON.stringify(user))
-      
+
       // Redirect to dashboard
       window.location.href = '/dashboard'
     } catch (error: any) {
@@ -154,7 +151,7 @@ export default function UpgradePage() {
       setProcessing(false)
     }
   }
-  
+
   // Show loading while checking auth
   if (loading) {
     return (
@@ -166,12 +163,12 @@ export default function UpgradePage() {
       </div>
     )
   }
-  
+
   // Don't render if not authenticated
   if (!isAuthenticated) {
     return null
   }
-  
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900 p-6">
       <div className="max-w-7xl mx-auto">
@@ -260,9 +257,8 @@ export default function UpgradePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 + index * 0.1 }}
-              className={`glass-dark p-8 rounded-2xl relative overflow-hidden ${
-                plan.popular ? 'ring-2 ring-primary-500' : ''
-              }`}
+              className={`glass-dark p-8 rounded-2xl relative overflow-hidden ${plan.popular ? 'ring-2 ring-primary-500' : ''
+                }`}
             >
               {plan.popular && (
                 <div className="absolute top-0 right-0 bg-primary-600 text-white px-4 py-1 text-sm font-semibold rounded-bl-lg">

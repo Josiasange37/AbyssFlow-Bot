@@ -5,7 +5,7 @@ const nextConfig = {
     domains: ['localhost', '*.ngrok.io', '*.ngrok-free.app'],
   },
   env: {
-    BOT_API_URL: process.env.BOT_API_URL || 'http://localhost:3001',
+    BOT_API_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001',
   },
   // Allow external access
   experimental: {

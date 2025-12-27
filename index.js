@@ -63,14 +63,14 @@ app.get('/api/sessions', (req, res) => {
 
 // 2. Start a new session (Authenticated)
 app.post('/api/sessions/start', authenticate, async (req, res) => {
-  const { id, pairingNumber } = req.body;
+  const { id, pairingNumber, botName } = req.body;
   const userId = req.user.uid;
 
   // Enforce session ownership (optional check or auto-use UID as ID)
   const sessionId = id || userId;
 
   try {
-    await BotManager.startSession(sessionId, pairingNumber);
+    await BotManager.startSession(sessionId, pairingNumber, { botName });
     res.json({ message: `Session ${sessionId} initialization started`, status: 'STARTING' });
   } catch (error) {
     res.status(500).json({ error: error.message });

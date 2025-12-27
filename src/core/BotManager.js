@@ -8,14 +8,14 @@ class BotManager extends EventEmitter {
         this.instances = new Map();
     }
 
-    async startSession(sessionId, pairingNumber = null) {
+    async startSession(sessionId, pairingNumber = null, options = {}) {
         if (this.instances.has(sessionId)) {
             log.info(`Session ${sessionId} already active.`);
             return this.instances.get(sessionId);
         }
 
-        log.info(`Starting new session: ${sessionId}`);
-        const bot = new PsychoBot(sessionId);
+        log.info(`Starting new session: ${sessionId} (Name: ${options.botName || 'Default'})`);
+        const bot = new PsychoBot(sessionId, options);
 
         // Setup listener for QR and Status
         bot.on('connection.update', (update) => {
