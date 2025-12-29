@@ -24,10 +24,10 @@ class LinkHandler {
             return await this.handleImage(bot, chatId, url, message);
         }
 
-        // 2. VIDEO DETECTION
-        const isVideo = this.videoDomains.some(domain => url.includes(domain));
+        // 2. VIDEO DETECTION (Known Domains)
+        const isVideoDomain = this.videoDomains.some(domain => url.includes(domain));
 
-        if (isVideo) {
+        if (isVideoDomain) {
             return await this.handleVideo(bot, chatId, url, message);
         } else {
             return await this.handleWebsite(bot, chatId, url, message);
@@ -36,21 +36,23 @@ class LinkHandler {
 
     async handleImage(bot, chatId, url, message) {
         try {
+            const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
+            const buffer = Buffer.from(res.data);
+
             await bot.sendMessage(chatId, {
-                image: { url },
+                image: buffer,
                 caption: `📸 Image récupérée mola ! ⚡\n🔗 ${url}`
             }, { quoted: message });
             return true;
         } catch (e) {
-            log.debug(`Direct image send failed: ${e.message}`);
+            log.debug(`Direct image download failed: ${e.message}`);
             return await this.handleWebsite(bot, chatId, url, message);
         }
     }
 
     async handleWebsite(bot, chatId, url, message) {
         try {
-            const options = { url };
-            const { result } = await ogs(options);
+            const { result } = await ogs({ url });
 
             if (result.success && result.ogTitle) {
                 let banner = `📰 *${result.ogTitle}*\n\n`;
@@ -58,10 +60,17 @@ class LinkHandler {
                 banner += `🔗 _${url}_`;
 
                 const msgConfig = { text: banner };
+
+                // Try to get OG Image as buffer to avoid "Video" bug on mobile
                 if (result.ogImage && result.ogImage[0] && result.ogImage[0].url) {
-                    msgConfig.image = { url: result.ogImage[0].url };
-                    msgConfig.caption = banner;
-                    delete msgConfig.text;
+                    try {
+                        const imgRes = await axios.get(result.ogImage[0].url, { responseType: 'arraybuffer', timeout: 8000 });
+                        msgConfig.image = Buffer.from(imgRes.data);
+                        msgConfig.caption = banner;
+                        delete msgConfig.text;
+                    } catch (e) {
+                        log.debug(`Could not download OG image buffer for ${url}: ${e.message}`);
+                    }
                 }
 
                 await bot.sendMessage(chatId, msgConfig, { quoted: message });
@@ -75,38 +84,45 @@ class LinkHandler {
 
     async handleVideo(bot, chatId, url, message) {
         try {
-            // Refined Detection (Avoid false positives for articles)
-            let isDefinitelyVideo = url.includes('/reel/') || url.includes('/watch') || url.includes('tiktok.com') || url.includes('fb.watch');
+            // Explicit check for known video paths to avoid article confusion
+            const isExplicitVideo =
+                url.includes('/reel/') ||
+                url.includes('/watch') ||
+                url.includes('/shorts/') ||
+                url.includes('tiktok.com') ||
+                url.includes('fb.watch') ||
+                url.includes('/videos/');
 
             // Expand link to check destination
             let finalUrl = url;
             try {
-                const headRes = await axios.head(url, { maxRedirects: 5, timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+                const headRes = await axios.head(url, { maxRedirects: 3, timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
                 finalUrl = headRes.request?.res?.responseUrl || headRes.headers?.location || url;
             } catch (e) { }
 
+            // Content Analysis via OG
             try {
                 const { result } = await ogs({ url: finalUrl });
                 const hasVideoTags = result.ogVideo || (result.ogType && result.ogType.includes('video'));
                 const isArticle = result.ogType === 'article' || result.ogType === 'website';
 
-                if (isArticle && !hasVideoTags && !isDefinitelyVideo) {
+                // If it looks like an article AND no explicit video hints -> Fallback to Website (Banner)
+                if (isArticle && !hasVideoTags && !isExplicitVideo) {
+                    log.info(`📄 Filtering out article disguised as video: ${finalUrl}`);
                     return await this.handleWebsite(bot, chatId, finalUrl, message);
                 }
             } catch (err) { }
 
             await bot.sendMessage(chatId, { text: "🎬 Vidéo détectée ! Je prépare le téléchargement mola... ⏳" }, { quoted: message });
 
-            // Brute Force API list - including specialized scrapers
             const apis = [
                 { url: `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}&hd=1`, type: 'tiktok' },
                 { url: `https://api.vreden.my.id/api/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
                 { url: `https://api.botcahx.eu.org/api/dowloader/fbdown?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
                 { url: `https://bk9.site/download/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
-                { url: `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(finalUrl)}`, type: 'general' },
-                { url: `https://api.agatz.xyz/api/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
                 { url: `https://bk9.site/download/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
-                { url: `https://api.tiklydown.eu.org/api/download?url=${encodeURIComponent(finalUrl)}`, type: 'tiktok' }
+                { url: `https://api.agatz.xyz/api/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
+                { url: `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(finalUrl)}`, type: 'general' }
             ];
 
             let downloadUrl = null;
@@ -114,6 +130,7 @@ class LinkHandler {
             let success = false;
 
             for (const api of apis) {
+                // Optimization: only hit platform-matching APIs
                 if (api.type !== 'general' && !finalUrl.toLowerCase().includes(api.type)) continue;
 
                 try {
