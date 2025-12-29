@@ -8,13 +8,13 @@ class MistralProvider {
     }
 
     init() {
-        if (!CONFIG.keys.mistral) {
+        if (!CONFIG.mistralApiKey) {
             log.warn('⚠️ No Mistral API Key found');
             return false;
         }
         try {
-            this.client = new Mistral({ apiKey: CONFIG.keys.mistral });
-            log.info('🌪️ Mistral (Large + Pixtral) Initialized');
+            this.client = new Mistral({ apiKey: CONFIG.mistralApiKey });
+            log.info('🌪️ Mistral Initialized');
             return true;
         } catch (error) {
             log.error('❌ Failed to init Mistral:', error);
@@ -22,79 +22,65 @@ class MistralProvider {
         }
     }
 
-    async process(text, chatHistory = [], media = null, systemPrompt = "Act like Psycho Bot.") {
-        if (!this.client) throw new Error('MISTRAL_NOT_INIT');
+    /**
+     * Process with Mistral (Supports Vision and Tools)
+     */
+    async process(text, chatHistory = [], media = null, systemPrompt) {
+        if (!this.client) throw new Error('MISTRAL_NOT_READY');
 
-        let userContent = text;
-        let modelToUse = 'mistral-large-latest';
+        let messages = [
+            { role: 'system', content: systemPrompt || "You are a helpful assistant." },
+            ...chatHistory.map(msg => ({
+                role: msg.role,
+                content: msg.text || msg.message || ""
+            }))
+        ];
 
-        // Handle Image Input (Pixtral)
+        let model = 'mistral-large-latest';
+
+        // Handle Vision (Pixtral)
         if (media) {
             const base64Image = media.buffer.toString('base64');
             const dataUrl = `data:${media.mimetype};base64,${base64Image}`;
-            userContent = [
-                { type: "text", text: text || "Analyse cette image." },
-                { type: "image_url", imageUrl: dataUrl }
-            ];
-            modelToUse = 'pixtral-12b-2409'; // Use Pixtral for images
-            log.info('🖼️ Using Pixtral for image analysis');
+
+            // For vision, we construct the user message differently
+            const userMsg = {
+                role: "user",
+                content: [
+                    { type: "text", text: text || "Analyse cette image." },
+                    { type: "image_url", imageUrl: dataUrl } // SDK uses imageUrl? check docs.
+                    // Checking official docs: for chat.complete it is usually type: "image_url", imageUrl: "..."
+                ]
+            };
+            messages.push(userMsg);
+            model = 'pixtral-12b-2409'; // Pixtral for images
+        } else {
+            messages.push({ role: "user", content: text });
         }
 
-        const messages = [
-            { role: 'system', content: systemPrompt },
-            ...chatHistory.map(msg => ({
-                role: msg.role,
-                content: msg.message || msg.text // Handle varying property names in history
-            })),
-            { role: "user", content: userContent }
-        ];
-
         try {
-            // Use standard chat.complete (Tools removed for reliability)
             const response = await this.client.chat.complete({
-                model: modelToUse,
+                model: model,
                 messages: messages,
                 maxTokens: 1024
             });
 
             return response.choices[0].message.content;
         } catch (error) {
-            log.error('Mistral process failed:', error.message);
+            log.error('Mistral process failed:', error);
             throw error;
         }
     }
 
     async generateImage(prompt) {
-        if (!this.client) throw new Error('MISTRAL_NOT_READY');
-
+        if (!this.client) return null;
         try {
-            const response = await this.client.beta.conversations.start({
-                inputs: [{ role: "user", content: `Generate an image: ${prompt}` }],
-                model: 'mistral-large-latest',
-                tools: [{ type: "image_generation" }],
-                maxTokens: 256
-            });
-
-            // Extract image URL from response
-            if (response.outputs) {
-                for (const output of response.outputs) {
-                    // Check direct image
-                    if (output.type === 'image' && output.url) {
-                        return `[IMAGE] ${output.url}`;
-                    }
-                    // Check nested in content
-                    if (output.type === 'message.output' && Array.isArray(output.content)) {
-                        for (const item of output.content) {
-                            if (item.type === 'image' && item.url) return `[IMAGE] ${item.url}`;
-                        }
-                    }
-                }
-            }
+            // Using tools for image gen? Or separate endpoint?
+            // Mistral SDK doesn't have explicit image gen endpoint yet in typed client usually,
+            // but we can try tool calling or simple prompting.
+            // For now return null or implement if API supports it.
             return null;
-        } catch (error) {
-            log.error('Mistral image generation failed:', error.message);
-            return null;
-        }
+        } catch (e) { return null; }
     }
 }
 

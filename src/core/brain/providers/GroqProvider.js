@@ -8,12 +8,12 @@ class GroqProvider {
     }
 
     init() {
-        if (!CONFIG.keys.groq) {
+        if (!CONFIG.groqApiKey) {
             log.warn('⚠️ No Groq API Key found');
             return false;
         }
         try {
-            this.client = new Groq({ apiKey: CONFIG.keys.groq });
+            this.client = new Groq({ apiKey: CONFIG.groqApiKey });
             log.info('🚀 Groq (Llama 3.3) Initialized');
             return true;
         } catch (error) {

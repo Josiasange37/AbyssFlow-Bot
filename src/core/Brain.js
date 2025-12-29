@@ -59,11 +59,11 @@ class PsychoBrain {
         }
 
         // 3. GitHub Models
-        if (CONFIG.keys.github) {
+        if (CONFIG.githubToken) {
             try {
                 this.githubClient = new OpenAI({
                     baseURL: "https://models.inference.ai.azure.com",
-                    apiKey: CONFIG.keys.github
+                    apiKey: CONFIG.githubToken
                 });
                 this.providerHealth.github.available = true;
                 log.info('🐙 GitHub Models Initialized');
@@ -71,20 +71,20 @@ class PsychoBrain {
         }
 
         // 4. Cohere
-        if (CONFIG.keys.cohere) {
+        if (CONFIG.cohereApiKey) {
             try {
-                this.cohere = new CohereClient({ token: CONFIG.keys.cohere });
+                this.cohere = new CohereClient({ token: CONFIG.cohereApiKey });
                 this.providerHealth.cohere.available = true;
                 log.info('🦜 Cohere Initialized');
             } catch (e) { log.error(`Cohere init failed: ${e.message}`); }
         }
 
         // 5. DeepSeek
-        if (CONFIG.keys.huggingface) {
+        if (CONFIG.hfToken) {
             try {
                 this.hfClient = new OpenAI({
                     baseURL: "https://api-inference.huggingface.co/v1/",
-                    apiKey: CONFIG.keys.huggingface
+                    apiKey: CONFIG.hfToken
                 });
                 this.providerHealth.deepseek.available = true;
                 log.info('🦄 DeepSeek (HF) Initialized');
@@ -93,6 +93,11 @@ class PsychoBrain {
 
         this.isInitialized = true;
         log.info(`🧠 PsychoBrain Refactored Initialized.`);
+    }
+
+    // Required by PsychoBot startup check
+    async init() {
+        return this.isInitialized;
     }
 
     isProviderAvailable(providerName) {
