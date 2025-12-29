@@ -183,8 +183,9 @@ class PsychoBrain {
     async process(text, chatId = 'global', media = null, userName = 'User') {
         if (!this.isInitialized) return "Brain offline (Init failed).";
 
-        // 1. Get System Prompt from Persona
-        const systemPrompt = Persona.generateSystemPrompt(userName);
+        // 1. Get Memory & System Prompt
+        const memories = Memory.retrieveRelevant(text);
+        const systemPrompt = Persona.generateSystemPrompt(userName) + memories;
         const chatHistory = await this.getHistory(chatId);
 
         // 2. Special Commands (Mistral Routing)
@@ -247,11 +248,14 @@ class PsychoBrain {
 
         if (!response) return "Oops, cerveaux HS. Réessaie dans 10 secondes. 🧠❌";
 
-        // Update Memory
+        // 6. Update Memory
         if (response.includes('[MEMORY:')) {
             const memMatch = response.match(/\[MEMORY: (.*?)\]/);
             if (memMatch) Persona.setFriendFact(userName, memMatch[1]);
         }
+
+        // 7. Store Significant Interactions in Long-Term Memory
+        await Memory.storeLongTerm(text, response, userName);
 
         chatHistory.push({ role: "model", text: response });
         await this.saveHistory(chatId, chatHistory);
