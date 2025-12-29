@@ -1032,7 +1032,15 @@ class PsychoBot extends EventEmitter {
         }
       }
 
-      const cleanText = text ? text.replace(/@[0-9]+/g, '').trim() : "";
+      // Context Extraction from Quoted Message
+      let contextText = "";
+      if (contextInfo?.quotedMessage) {
+        const q = contextInfo.quotedMessage;
+        const qText = q.conversation || q.extendedTextMessage?.text || "";
+        if (qText) contextText = `\n\n[CONTEXTE - RÉPONSE À]: "${qText}"`;
+      }
+
+      const cleanText = (text ? text.replace(/@[0-9]+/g, '').trim() : "") + contextText;
 
       // Empty interaction feedback
       if (!cleanText && !media) {
@@ -1068,7 +1076,8 @@ class PsychoBot extends EventEmitter {
         } catch (e) { log.debug('Failed to get group metadata for context'); }
       }
 
-      let response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media);
+      // Pass userName to Brain for Persona Logic
+      let response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media, userName);
 
       if (response) {
         // --- AGENTIC EXECUTION PROTOCOL ---
