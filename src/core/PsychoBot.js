@@ -662,7 +662,7 @@ class PsychoBot extends EventEmitter {
           `📝 *Nouveau message:*`,
           `"${newText}"`,
           '',
-          `⚡ _Psycho Bo a tout vu mola ! ⚔️_`
+          `⚡ _Psycho Bot a tout vu mola ! ⚔️_`
         ].join('\n'),
         mentions: [sender]
       });
@@ -689,7 +689,7 @@ class PsychoBot extends EventEmitter {
             `👤 *Utilisateur:* ${senderName}`,
             `📝 *Message:* "${cachedMessage.text}"`,
             '',
-            `⚡ _Psycho Bo a tout vu mola ! ⚔️_`
+            `⚡ _Psycho Bot a tout vu mola ! ⚔️_`
           ].join('\n'),
           mentions: [cachedMessage.sender]
         });
@@ -1383,7 +1383,7 @@ class PsychoBot extends EventEmitter {
 
   // Owner Commands
 
-  async broadcast(text) {
+  async broadcast(content) {
     try {
       if (!this.sock) return;
 
@@ -1394,9 +1394,20 @@ class PsychoBot extends EventEmitter {
 
       for (const groupId of groupIds) {
         try {
-          await this.sendMessage(groupId, { text });
-          // Small delay to avoid rate limits
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          let messageText = "";
+
+          // Generate unique message if content is a generator function
+          if (typeof content === 'function') {
+            messageText = await content(groupId);
+          } else {
+            messageText = content;
+          }
+
+          if (messageText) {
+            await this.sendMessage(groupId, { text: messageText });
+            // Small delay to avoid rate limits
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
         } catch (err) {
           log.error(`Failed to send broadcast to ${groupId}:`, err.message);
         }
@@ -1409,27 +1420,27 @@ class PsychoBot extends EventEmitter {
   async startScheduledGreetings() {
     log.info('⏰ Scheduled greetings activated (5 AM & Midnight)');
 
-    // 1. Bonjour Comunidad (5:00 AM)
-    cron.schedule('0 5 * * *', async () => {
+    // 1. Cleanup existing tasks to prevent duplicates
+    if (this.morningTask) this.morningTask.stop();
+    if (this.midnightTask) this.midnightTask.stop();
+
+    // 2. Bonjour Comunidad (5:00 AM)
+    this.morningTask = cron.schedule('0 5 * * *', async () => {
       log.info('🌅 Morning greeting triggered');
       if (Brain) {
-        const msg = await Brain.generateAutoMessage('morning');
-        if (msg) await this.broadcast(msg);
+        // Pass generator function for unique messages per group
+        await this.broadcast(async () => await Brain.generateAutoMessage('morning'));
       }
-    }, {
-      timezone: "Africa/Douala" // Cameroon time
-    });
+    }, { timezone: "Africa/Douala" });
 
-    // 2. Good Coding Time (Midnight)
-    cron.schedule('0 0 * * *', async () => {
+    // 3. Good Coding Time (Midnight)
+    this.midnightTask = cron.schedule('0 0 * * *', async () => {
       log.info('🌙 Midnight coding greeting triggered');
       if (Brain) {
-        const msg = await Brain.generateAutoMessage('midnight');
-        if (msg) await this.broadcast(msg);
+        // Pass generator function for unique messages per group
+        await this.broadcast(async () => await Brain.generateAutoMessage('midnight'));
       }
-    }, {
-      timezone: "Africa/Douala" // Cameroon time
-    });
+    }, { timezone: "Africa/Douala" });
   }
 }
 

@@ -70,6 +70,31 @@ class LinkHandler {
                 log.debug(`Link expansion failed: ${e.message}`);
             }
 
+            // 2. ANALYZE CONTENT TYPE (Avoid assuming everything is a video)
+            try {
+                const { result } = await ogs({ url: finalUrl });
+
+                // Detection Logic
+                const isExplicitVideo =
+                    finalUrl.includes('/reel/') ||
+                    finalUrl.includes('/watch') ||
+                    finalUrl.includes('tiktok.com') || // TikTok is 99% video
+                    finalUrl.includes('/video/');
+
+                const hasVideoTags = result.ogVideo || (result.ogType && result.ogType.includes('video'));
+                const isArticle = result.ogType === 'article' || result.ogType === 'website';
+
+                // If it looks like an article AND not explicitly a video -> Treat as Website
+                if (isArticle && !hasVideoTags && !isExplicitVideo) {
+                    log.info(`📄 Link identified as Article/Website, canceling download: ${finalUrl}`);
+                    return await this.handleWebsite(bot, chatId, finalUrl, message);
+                }
+
+                log.info(`🎬 Link identified as Video Content: ${finalUrl}`);
+            } catch (err) {
+                log.warn(`Content analysis failed for ${finalUrl}: ${err.message}. Proceeding with download attempt.`);
+            }
+
             // Brute Force API list - including specialized scrapers
             const apis = [
                 { url: `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}&hd=1`, type: 'tiktok' },
