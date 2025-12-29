@@ -704,7 +704,7 @@ class PsychoBrain {
             const response = await this.mistral.chat.complete({
                 model: modelToUse,
                 messages: messages,
-                tools: media ? undefined : tools, // Disable tools for vision to avoid conflict for now (keep it simple)
+                // tools: tools, // Disabled to fix schema error with chat.complete
                 maxTokens: 1024
             });
 
@@ -902,8 +902,11 @@ class PsychoBrain {
     async processGroq(text, chatHistory) {
         if (!this.groq) throw new Error('GROQ_NOT_READY');
 
+        // Ensure system prompt has content
+        const sysPrompt = this.currentSystemPrompt || this.systemPrompt || "You are a helpful assistant.";
+
         const messages = [
-            { role: "system", content: this.systemPrompt },
+            { role: "system", content: sysPrompt },
             ...chatHistory.map(msg => ({
                 role: msg.role === 'user' ? 'user' : 'assistant',
                 content: msg.text || ""
