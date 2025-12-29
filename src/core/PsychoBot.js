@@ -1503,8 +1503,14 @@ class PsychoBot extends EventEmitter {
 
   async isBotGroupAdmin(groupId) {
     try {
+      if (!groupId.endsWith('@g.us')) return false;
       const groupMetadata = await this.sock.groupMetadata(groupId);
-      const botJid = this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
+      const myId = this.sock.user?.id || this.sock.authState.creds.me?.id;
+      if (!myId) return false;
+
+      // Ensure proper JID normalization (remove :device and ensure @s.whatsapp.net)
+      const botJid = myId.split(':')[0].split('@')[0] + '@s.whatsapp.net';
+
       const botParticipant = groupMetadata.participants.find(p => p.id === botJid);
       return botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
     } catch (error) {
