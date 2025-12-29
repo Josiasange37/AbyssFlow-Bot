@@ -138,6 +138,8 @@ class LinkHandler {
                 { url: `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}&hd=1`, type: 'tiktok' },
                 { url: `https://api.vreden.my.id/api/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
                 { url: `https://api.botcahx.eu.org/api/dowloader/fbdown?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
+                { url: `https://api.botcahx.eu.org/api/dowloader/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
+                { url: `https://api.agatz.xyz/api/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
                 { url: `https://bk9.site/download/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
                 { url: `https://bk9.site/download/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
                 { url: `https://api.agatz.xyz/api/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
@@ -152,10 +154,11 @@ class LinkHandler {
             let success = false;
 
             for (const api of apis) {
-                // Better type matching for YouTube/YouTu.be
+                // Better type matching for YouTube/Facebook/Instagram
                 const isMatch = api.type === 'general' ||
                     finalUrl.toLowerCase().includes(api.type) ||
-                    (api.type === 'youtube' && finalUrl.toLowerCase().includes('youtu.be'));
+                    (api.type === 'youtube' && finalUrl.toLowerCase().includes('youtu.be')) ||
+                    (api.type === 'facebook' && (finalUrl.toLowerCase().includes('fb.watch') || finalUrl.toLowerCase().includes('fb.me')));
 
                 if (!isMatch) continue;
 
