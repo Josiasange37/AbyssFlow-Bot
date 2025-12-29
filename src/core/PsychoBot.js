@@ -8,10 +8,13 @@ const axios = require('axios');
 const sharp = require('sharp');
 const { log, LOG_THRESHOLD, LOG_LEVEL_MAP } = require('../utils/logger');
 const { normalizeNumber } = require('../utils/helpers');
+const LinkHandler = require('../utils/LinkHandler');
 const { CONFIG } = require('../config');
 const Brain = require('./Brain');
 const Memory = require('./Memory');
 const { connectDB } = require('../database');
+const GroupSettings = require('../database/models/GroupSettings');
+const useMongoAuthState = require('./mongoAuth');
 const qrcode = require('qrcode-terminal');
 
 class PsychoBot extends EventEmitter {
@@ -477,8 +480,8 @@ class PsychoBot extends EventEmitter {
         messageContent.image = welcomeBanner;
         messageContent.caption = message;
         delete messageContent.text;
-      } else if (ppUrl) {
-        messageContent.image = { url: ppUrl };
+      } else if (userPpUrl) {
+        messageContent.image = { url: userPpUrl };
         messageContent.caption = message;
         delete messageContent.text;
       }
