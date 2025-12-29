@@ -558,17 +558,7 @@ class PsychoBot extends EventEmitter {
     }
     try {
       // Human-like typing delay for text messages
-      if (content.text || typeof content === 'string') {
-        const text = content.text || content;
-        const charCount = text.length;
-        // Average typing speed: ~50ms per char + base processing time
-        // Min 1s, Max 8s to avoid being too slow
-        const delay = Math.min(Math.max(charCount * 40, 1000), 8000);
-
-        await this.sock.sendPresenceUpdate('composing', jid);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        await this.sock.sendPresenceUpdate('paused', jid);
-      }
+      // Typing delay removed for speed - handled by caller or plugins if needed
 
       return await this.sock.sendMessage(jid, content, options);
     } catch (error) {
@@ -1037,6 +1027,9 @@ class PsychoBot extends EventEmitter {
       }
 
       // --- AI CONTEXT ENHANCEMENT: Group Participants ---
+      // Immediate feedback: Show typing status while processing
+      await this.sock.sendPresenceUpdate('composing', chatId);
+
       let participantsInfo = "";
       let participantsMap = new Map();
       if (isGroup) {
