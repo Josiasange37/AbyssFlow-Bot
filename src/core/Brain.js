@@ -45,7 +45,7 @@ class PsychoBrain {
 
         // Cooldown durations (ms) for quota errors
         this.QUOTA_COOLDOWN = 60 * 60 * 1000; // 1 hour for quota exhaustion
-        this.ERROR_COOLDOWN = 5 * 60 * 1000;  // 5 minutes for general errors
+        this.ERROR_COOLDOWN = 30 * 1000;  // 30 seconds for general errors
         this.HEALTH_CHECK_INTERVAL = 30 * 60 * 1000; // Check health every 30 mins
 
         // Initialize Mood State
@@ -257,8 +257,19 @@ class PsychoBrain {
      */
     isProviderAvailable(providerName) {
         const health = this.providerHealth[providerName];
-        if (!health || !health.available) return false;
-        if (Date.now() < health.cooldownUntil) return false;
+        if (!health) return false;
+
+        if (!health.available) {
+            log.debug(`[${providerName}] Unavailable (not configured or disabled)`);
+            return false;
+        }
+
+        if (Date.now() < health.cooldownUntil) {
+            const remaining = Math.ceil((health.cooldownUntil - Date.now()) / 1000);
+            log.warn(`[${providerName}] In cooldown for ${remaining}s`);
+            return false;
+        }
+
         return true;
     }
 
