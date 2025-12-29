@@ -41,7 +41,7 @@ class LinkHandler {
 
             await bot.sendMessage(chatId, {
                 image: buffer,
-                caption: `📸 Image récupérée mola ! ⚡\n🔗 ${url}`
+                caption: `📸 Image récupérée ! ⚡\n🔗 ${url}`
             }, { quoted: message });
             return true;
         } catch (e) {
@@ -113,7 +113,7 @@ class LinkHandler {
                 }
             } catch (err) { }
 
-            await bot.sendMessage(chatId, { text: "🎬 Vidéo détectée ! Je prépare le téléchargement mola... ⏳" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "🎬 Vidéo détectée ! Je prépare le téléchargement... ⏳" }, { quoted: message });
 
             const apis = [
                 { url: `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}&hd=1`, type: 'tiktok' },
@@ -160,7 +160,7 @@ class LinkHandler {
 
                 await bot.sendMessage(chatId, {
                     video: Buffer.from(videoResponse.data),
-                    caption: `🎥 *ANALYSE VIDÉO*\n\n"${aiDescription}"\n\n🔗 ${url}\n⚡ _Flow Psycho Bo God Mode_`
+                    caption: `🎥 *ANALYSE VIDÉO*\n\n"${aiDescription}"\n\n🔗 ${url}\n⚡ _Flow Psycho Bot_`
                 }, { quoted: message });
                 return true;
             } else {
