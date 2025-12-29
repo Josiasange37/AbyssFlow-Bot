@@ -915,13 +915,20 @@ class PsychoBot extends EventEmitter {
 
     // Robust Context Extraction
     const contextInfo = this.getContextInfo(message.message);
-    const myJid = this.sock.user?.id || '';
+    // Robust ID fetching (User ID or Creds ID)
+    const myJid = this.sock.user?.id || this.sock.authState.creds.me?.id || '';
     const myNumber = normalizeNumber(myJid);
     const mentionedJids = contextInfo?.mentionedJid || [];
+    const normalizedText = (text || '').toLowerCase();
 
     // Trigger Logic
     const isTagMentioned = mentionedJids.some(jid => normalizeNumber(jid) === myNumber) ||
       (text && text.includes(`@${myNumber}`));
+
+    // Debug Mention logic if mention is suspected but not triggered
+    if (text && text.includes('@') && !isTagMentioned) {
+      // log.debug(`Potential mention ignored. MyNum: ${myNumber}, Mentions: ${JSON.stringify(mentionedJids)}`);
+    }
 
     // Enhanced Reply Check
     let isReplyToBot = false;
