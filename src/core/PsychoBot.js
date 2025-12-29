@@ -869,6 +869,7 @@ class PsychoBot extends EventEmitter {
     if (message.key.fromMe && !isPrefixed) return;
 
     const sender = message.key.participant || message.key.remoteJid;
+    const userName = message.pushName || 'Inconnu';
     const isGroup = chatId.endsWith('@g.us');
 
     // --- DRAMA DETECTOR (Popcorn Mode) ---
