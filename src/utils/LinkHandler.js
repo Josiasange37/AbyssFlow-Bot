@@ -55,21 +55,44 @@ class LinkHandler {
             const { result } = await ogs({ url });
 
             if (result.success && result.ogTitle) {
+                // Determine if we should summarize
+                const isArticle = result.ogType === 'article' || result.ogType === 'website';
+                let contextText = result.ogDescription || result.ogTitle;
+
+                let summary = "";
+                if (isArticle) {
+                    const prompt = `Résume cet article en 2-3 phrases simples et professionnelles (pas de jargon, pas d'argot): "${contextText}"`;
+                    try {
+                        summary = await Brain.process(prompt, chatId, null, "Système de Veille");
+                        // Remove AI metadata if any
+                        summary = summary.replace(/\[MEMORY: .*?\]/g, '').trim();
+                    } catch (e) {
+                        summary = contextText;
+                    }
+                }
+
                 let banner = `📰 *${result.ogTitle}*\n\n`;
-                if (result.ogDescription) banner += `${result.ogDescription}\n\n`;
+                if (summary) banner += `${summary}\n\n`;
                 banner += `🔗 _${url}_`;
 
                 const msgConfig = { text: banner };
 
-                // Try to get OG Image as buffer to avoid "Video" bug on mobile
                 if (result.ogImage && result.ogImage[0] && result.ogImage[0].url) {
                     try {
-                        const imgRes = await axios.get(result.ogImage[0].url, { responseType: 'arraybuffer', timeout: 8000 });
-                        msgConfig.image = Buffer.from(imgRes.data);
-                        msgConfig.caption = banner;
-                        delete msgConfig.text;
+                        const imgRes = await axios.get(result.ogImage[0].url, {
+                            responseType: 'arraybuffer',
+                            timeout: 10000,
+                            headers: { 'User-Agent': 'Mozilla/5.0' }
+                        });
+                        const contentType = imgRes.headers['content-type'] || 'image/jpeg';
+
+                        if (contentType.includes('image')) {
+                            msgConfig.image = Buffer.from(imgRes.data);
+                            msgConfig.caption = banner;
+                            delete msgConfig.text;
+                        }
                     } catch (e) {
-                        log.debug(`Could not download OG image buffer for ${url}: ${e.message}`);
+                        log.debug(`Could not download OG image for ${url}: ${e.message}`);
                     }
                 }
 
@@ -84,7 +107,6 @@ class LinkHandler {
 
     async handleVideo(bot, chatId, url, message) {
         try {
-            // Explicit check for known video paths to avoid article confusion
             const isExplicitVideo =
                 url.includes('/reel/') ||
                 url.includes('/watch') ||
@@ -93,27 +115,24 @@ class LinkHandler {
                 url.includes('fb.watch') ||
                 url.includes('/videos/');
 
-            // Expand link to check destination
             let finalUrl = url;
             try {
                 const headRes = await axios.head(url, { maxRedirects: 3, timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
                 finalUrl = headRes.request?.res?.responseUrl || headRes.headers?.location || url;
             } catch (e) { }
 
-            // Content Analysis via OG
             try {
                 const { result } = await ogs({ url: finalUrl });
                 const hasVideoTags = result.ogVideo || (result.ogType && result.ogType.includes('video'));
                 const isArticle = result.ogType === 'article' || result.ogType === 'website';
 
-                // If it looks like an article AND no explicit video hints -> Fallback to Website (Banner)
                 if (isArticle && !hasVideoTags && !isExplicitVideo) {
-                    log.info(`📄 Filtering out article disguised as video: ${finalUrl}`);
+                    log.info(`📄 Filtering out article: ${finalUrl}`);
                     return await this.handleWebsite(bot, chatId, finalUrl, message);
                 }
             } catch (err) { }
 
-            await bot.sendMessage(chatId, { text: "🎬 Vidéo détectée ! Je prépare le téléchargement... ⏳" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: "🎬 Média détecté ! Préparation du contenu... ⏳" }, { quoted: message });
 
             const apis = [
                 { url: `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}&hd=1`, type: 'tiktok' },
@@ -130,7 +149,6 @@ class LinkHandler {
             let success = false;
 
             for (const api of apis) {
-                // Optimization: only hit platform-matching APIs
                 if (api.type !== 'general' && !finalUrl.toLowerCase().includes(api.type)) continue;
 
                 try {
@@ -151,24 +169,35 @@ class LinkHandler {
             }
 
             if (success && downloadUrl) {
-                const aiDescription = await Brain.generateVideoDescription(videoMetadata);
                 const videoResponse = await axios.get(downloadUrl, {
                     responseType: 'arraybuffer',
                     timeout: 45000,
                     headers: { 'User-Agent': 'Mozilla/5.0' }
                 });
 
-                await bot.sendMessage(chatId, {
-                    video: Buffer.from(videoResponse.data),
-                    caption: `🎥 *ANALYSE VIDÉO*\n\n"${aiDescription}"\n\n🔗 ${url}\n⚡ _Flow Psycho Bot_`
-                }, { quoted: message });
+                const buffer = Buffer.from(videoResponse.data);
+                const contentType = videoResponse.headers['content-type'] || '';
+
+                // CRITICAL: Differentiate between Image and Video to fix mobile bug
+                const isImage = contentType.includes('image');
+                const mediaType = isImage ? 'image' : 'video';
+
+                const aiDescription = await Brain.process(`Décris brièvement ce contenu média: "${videoMetadata.title || "Contenu partagé"}"`, chatId, null, "Analyseur Média");
+                const cleanDesc = aiDescription.replace(/\[MEMORY: .*?\]/g, '').trim();
+
+                const msgObj = {
+                    [mediaType]: buffer,
+                    caption: `📦 *CONTENU RÉCUPÉRÉ*\n\n"${cleanDesc}"\n\n🔗 ${url}\n⚡ _Psycho Bot_`
+                };
+
+                await bot.sendMessage(chatId, msgObj, { quoted: message });
                 return true;
             } else {
                 throw new Error('All APIs failed');
             }
         } catch (error) {
-            log.error(`Video download failed for ${url}: ${error.message}`);
-            await bot.sendMessage(chatId, { text: "Désolé bg, j'arrive pas à graille cette vidéo. Elle est peut-être privée ou le lien est mort. 💀" }, { quoted: message });
+            log.error(`Media processing failed for ${url}: ${error.message}`);
+            await bot.sendMessage(chatId, { text: "Désolé, je n'ai pas pu récupérer ce contenu. Il est peut-être privé ou protégé. 🛠️" }, { quoted: message });
         }
         return false;
     }
