@@ -192,7 +192,7 @@ class PsychoBrain {
             try {
                 this.groq = new Groq({ apiKey: CONFIG.groqApiKey });
                 this.providerHealth.groq.available = true;
-                log.info('🧠 [FALLBACK-1] Groq (Llama 3.3) ready.');
+                log.info('🧠 [PRIMARY] Groq (Llama 3.3) ready.');
             } catch (error) {
                 log.error('Failed to init Groq:', error.message);
             }
@@ -532,20 +532,22 @@ class PsychoBrain {
 
             const providers = [
                 {
-                    name: 'gemini',
-                    label: 'Gemini 2.0',
-                    fn: () => this.processGemini(finalText, chatHistory)
-                },
-                {
                     name: 'groq',
-                    label: 'Groq (Llama 3.3)',
+                    label: 'Groq (Llama 3.3) [PRIMARY]',
                     fn: () => this.processGroq(finalText, chatHistory)
                 },
                 {
                     name: 'mistral',
-                    label: 'Mistral',
+                    label: 'Mistral [SECONDARY]',
                     fn: () => this.processMistral(finalText, chatHistory)
                 },
+                /* Gemini Disabled by User Request
+                {
+                    name: 'gemini',
+                    label: 'Gemini 2.0',
+                    fn: () => this.processGemini(finalText, chatHistory)
+                }, */
+                /* Other fallbacks disabled for strict Groq/Mistral usage
                 {
                     name: 'github',
                     label: 'GitHub (GPT-4o-mini)',
@@ -561,6 +563,7 @@ class PsychoBrain {
                     label: 'DeepSeek-V3',
                     fn: () => this.processDeepSeek(finalText, chatHistory)
                 }
+                */
             ];
 
             for (const provider of providers) {
