@@ -879,24 +879,43 @@ class PsychoBot extends EventEmitter {
       const now = Date.now();
       let tracker = this.dramaTracker.get(chatId) || { count: 0, lastTime: now, cooldown: 0 };
 
-      // Reset if too much time passed (2s window)
-      if (now - tracker.lastTime > 2000) {
+      // Reset if too much time passed (5s window for better burst detection)
+      if (now - tracker.lastTime > 5000) {
         tracker.count = 0;
       }
 
       tracker.count++;
       tracker.lastTime = now;
 
-      // Trigger if > 5 msg in 2 sec (Spike) AND not in cooldown
-      if (tracker.count > 6 && now > tracker.cooldown) {
-        log.info(`🍿 DRAMA DETECTED in ${chatId}`);
-        // Send random drama reaction
-        const reactions = ["🍿", "👀", "🔥", "☕"];
-        const reaction = reactions[Math.floor(Math.random() * reactions.length)];
+      // Trigger if > 8 msg in 5 sec (Burst) AND not in cooldown
+      if (tracker.count > 8 && now > tracker.cooldown) {
+        log.info(`🎭 INTELLIGENT MEDIATION TRIGGERED in ${chatId}`);
 
-        await this.sendMessage(chatId, { text: reaction });
+        // Asynchronous Intelligent Intervention
+        (async () => {
+          try {
+            const history = await Brain.getHistory(chatId);
+            if (history.length < 5) return;
 
-        tracker.cooldown = now + 60000; // 1 min cooldown
+            const conversationContext = history.filter(m => m.role === 'user').slice(-10).map(m => m.text).join('\n');
+            const mediationPrompt = `[DRAMA DETECTOR - ANALYSE D'AMBIANCE]
+            Il y a une forte explosion de messages dans ce groupe. Analyse l'ambiance des 10 derniers messages ci-dessous.
+            - Si c'est du drama ou une dispute : Interviens avec calme, sagesse et une touche d'humour pour calmer les tensions.
+            - Si c'est juste du spam ou de la joie : Réagis avec un emoji cool ou une petite phrase d'encouragement.
+            - Si c'est une discussion intense mais saine : Fais un mini résumé (1 ligne) pour aider ceux qui débarquent.
+            
+            HISTORIQUE RÉCENT :
+            ${conversationContext}`;
+
+            const intervention = await Brain.process(mediationPrompt, chatId, null, "Médiateur du Clan");
+            if (intervention) {
+              const cleanInt = intervention.replace(/\[MEMORY: .*?\]/g, '').trim();
+              await this.sendMessage(chatId, { text: `🎭 *MÉDIATEUR D'ALLIANCE* 🤖\n\n${cleanInt}` });
+            }
+          } catch (err) { log.error('Mediation failed:', err.message); }
+        })();
+
+        tracker.cooldown = now + 120_000; // 2 min cooldown for mediation
         tracker.count = 0;
       }
       this.dramaTracker.set(chatId, tracker);

@@ -4,6 +4,12 @@ const path = require('path');
 class Persona {
     constructor() {
         this.friendFacts = new LocalStorage(path.join(process.cwd(), 'data', 'friend_facts'));
+        // Stable visual identity for Psycho Bot
+        this.visualIdentity = "A sophisticated digital entity, humanoid silhouette made of glowing blue data streams and obsidian glass. Sleek, minimalist design, futuristic cybernetic eyes with a calm expression. Glowing neural networks visible within its transparent structure. Cinematic lighting, 8k resolution, cyberpunk aesthetic, professional digital art style.";
+    }
+
+    getBotVisualPrompt(scenario = "smiling at the camera") {
+        return `${this.visualIdentity} The entity is ${scenario}. Background: a high-tech digital void with floating code and geometric patterns.`;
     }
 
     getFriendFact(userName) {
