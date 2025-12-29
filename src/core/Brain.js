@@ -886,7 +886,7 @@ class PsychoBrain {
 
         const response = await this.cohere.chat({
             message: text,
-            model: 'command-r-plus',
+            model: 'command-r',
             preamble: this.systemPrompt,
             chatHistory: chat_history
         });
