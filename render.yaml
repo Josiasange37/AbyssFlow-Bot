@@ -4,7 +4,11 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install
-    startCommand: node api/bot.js
+    startCommand: npm start
+    disk:
+      name: psycho-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -23,8 +27,6 @@ services:
       - key: HF_TOKEN
         sync: false
       - key: GEMINI_API_KEY
-        sync: false
-      - key: MONGO_URI
         sync: false
       - key: SEARCH_API_KEY
         sync: false
