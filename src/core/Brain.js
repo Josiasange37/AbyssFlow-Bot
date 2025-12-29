@@ -172,20 +172,12 @@ class PsychoBrain {
 
 
     initProviders() {
+        /* Gemini Disabled
         // 1. GEMINI (PRIMARY - Best Quality) - Using Gemini 2.5 Flash
         if (CONFIG.geminiApiKey) {
-            try {
-                this.genAI = new GoogleGenerativeAI(CONFIG.geminiApiKey);
-                this.geminiModel = this.genAI.getGenerativeModel({
-                    model: "gemini-2.0-flash", // Latest stable, will use 2.5 when available
-                    systemInstruction: this.systemPrompt
-                });
-                this.providerHealth.gemini.available = true;
-                log.info('🧠 [PRIMARY] Gemini 2.0 Flash ready.');
-            } catch (error) {
-                log.error('Failed to init Gemini:', error.message);
-            }
+            // ... (Removed)
         }
+        */
 
         // 2. GROQ (Grok/Llama - Fast fallback)
         if (CONFIG.groqApiKey) {
@@ -504,27 +496,19 @@ class PsychoBrain {
 
         const finalText = text + searchContext;
 
-        // MULTIMODAL MODE: Try Gemini first (best for vision), then GitHub
+        // MULTIMODAL MODE: Use GitHub (GPT-4o-mini) for vision since Groq is text-only
         if (media) {
             try {
-                if (this.isProviderAvailable('gemini')) {
-                    response = await this.processGemini(finalText, chatHistory, media);
-                    this.resetProviderHealth('gemini');
+                if (this.isProviderAvailable('github')) {
+                    response = await this.processGitHub(finalText, chatHistory, media);
+                    this.resetProviderHealth('github');
                 } else {
-                    throw new Error('GEMINI_COOLDOWN');
+                    // Fallback if GitHub is unavailable (Groq/Mistral here are text-only)
+                    response = "Je ne peux pas analyser les images pour le moment (GitHub Vision indisponible).";
                 }
             } catch (err) {
-                this.setProviderCooldown('gemini', err);
-                try {
-                    if (this.isProviderAvailable('github')) {
-                        response = await this.processGitHub(finalText, chatHistory, media);
-                        this.resetProviderHealth('github');
-                    } else {
-                        throw new Error('GITHUB_COOLDOWN');
-                    }
-                } catch (errGh) {
-                    // Fallback to Mistral logic or null
-                }
+                this.setProviderCooldown('github', err);
+                response = "Erreur lors de l'analyse de l'image.";
             }
         } else {
             // TEXT MODE - Smart Fallback Chain
