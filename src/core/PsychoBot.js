@@ -1038,11 +1038,12 @@ class PsychoBot extends EventEmitter {
       }
 
       const cleanText = (text ? text.replace(/@[0-9]+/g, '').trim() : "") + contextText;
+      const availableCommands = Array.from(new Set(this.commands.values())).map(c => c.name).join(', ');
 
       // Empty interaction feedback
       if (!cleanText && !media) {
-        if (isTagMentioned) await this.sendMessage(chatId, { text: "Wesh ? Tu m'as appelé ? 🤙⚡ (Ajoute du texte pour que je réponde !)" }, { quoted: message });
-        else if (isReplyToBot) await this.sendMessage(chatId, { text: "Je t'écoute le sang... 👂 Dis-moi un truc !" }, { quoted: message });
+        if (isTagMentioned) await this.sendMessage(chatId, { text: "Besoin d'aide ? Je suis à ton écoute. 🤙⚡" }, { quoted: message });
+        else if (isReplyToBot) await this.sendMessage(chatId, { text: "Je t'écoute. Dis-moi un truc !" }, { quoted: message });
         return;
       }
 
@@ -1073,8 +1074,8 @@ class PsychoBot extends EventEmitter {
         } catch (e) { log.debug('Failed to get group metadata for context'); }
       }
 
-      // Pass userName to Brain for Persona Logic
-      let response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media, userName);
+      // Pass userName and availableCommands to Brain for Agentic Logic
+      let response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media, userName, availableCommands);
 
       if (response) {
         // --- AGENTIC EXECUTION PROTOCOL ---
