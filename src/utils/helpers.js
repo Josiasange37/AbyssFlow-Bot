@@ -32,11 +32,11 @@ async function withTimeout(promise, timeoutMs = 30000, errorMessage = 'Opératio
 
 // Calculate realistic typing duration based on message length
 function calculateTypingDuration(messageLength) {
-    // Optimized for speed: ~15 characters per second
-    const baseTime = 500; // Minimum 0.5 second
-    const typingTime = (messageLength / 15) * 1000;
-    const randomVariation = Math.random() * 500;
-    return Math.min(baseTime + typingTime + randomVariation, 3500); // Max 3.5 seconds
+    // Optimized for speed: ~50 characters per second (Super fast)
+    const baseTime = 100; // Minimum 0.1 second
+    const typingTime = (messageLength / 50) * 1000;
+    const randomVariation = Math.random() * 200;
+    return Math.min(baseTime + typingTime + randomVariation, 1500); // Max 1.5 seconds
 }
 
 module.exports = {
