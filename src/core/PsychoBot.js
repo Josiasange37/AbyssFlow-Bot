@@ -1038,7 +1038,10 @@ class PsychoBot extends EventEmitter {
       }
 
       const cleanText = (text ? text.replace(/@[0-9]+/g, '').trim() : "") + contextText;
-      const availableCommands = Array.from(new Set(this.commands.values())).map(c => c.name).join(', ');
+
+      // Get unique commands with descriptions for AI mastery
+      const uniqueCommands = Array.from(new Set(this.commands.values()));
+      const availableCommands = uniqueCommands.map(c => `- ${c.name}: ${c.description || 'Pas de description'}`).join('\n');
 
       // Empty interaction feedback
       if (!cleanText && !media) {
