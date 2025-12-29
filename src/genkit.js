@@ -1,7 +1,4 @@
-/**
- * Genkit AI Configuration - Alternative to Brain.js for standalone flows
- * Uses Gemini 2.0 Flash (latest stable model)
- */
+
 require('dotenv').config();
 
 const { gemini20Flash, googleAI } = require('@genkit-ai/googleai');
