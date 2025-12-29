@@ -31,36 +31,34 @@ class MistralProvider {
         let messages = [
             { role: 'system', content: systemPrompt || "You are a helpful assistant." },
             ...chatHistory.map(msg => ({
-                role: msg.role,
+                role: msg.role === 'user' ? 'user' : 'assistant',
                 content: msg.text || msg.message || ""
             }))
         ];
 
-        let model = 'mistral-large-latest';
+        let modelName = 'mistral-large-latest';
 
         // Handle Vision (Pixtral)
         if (media) {
             const base64Image = media.buffer.toString('base64');
             const dataUrl = `data:${media.mimetype};base64,${base64Image}`;
 
-            // For vision, we construct the user message differently
             const userMsg = {
                 role: "user",
                 content: [
                     { type: "text", text: text || "Analyse cette image." },
-                    { type: "image_url", imageUrl: dataUrl } // SDK uses imageUrl? check docs.
-                    // Checking official docs: for chat.complete it is usually type: "image_url", imageUrl: "..."
+                    { type: "image_url", image_url: dataUrl } // Use image_url (standard)
                 ]
             };
             messages.push(userMsg);
-            model = 'pixtral-12b-2409'; // Pixtral for images
+            modelName = 'pixtral-12b-2409';
         } else {
             messages.push({ role: "user", content: text });
         }
 
         try {
             const response = await this.client.chat.complete({
-                model: model,
+                model: modelName,
                 messages: messages,
                 maxTokens: 1024
             });
