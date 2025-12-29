@@ -9,7 +9,14 @@ async function connectDB() {
     }
 
     try {
-        await mongoose.connect(CONFIG.mongoUri);
+        // Disable buffering to fail fast if connection is down
+        mongoose.set('bufferCommands', false);
+
+        await mongoose.connect(CONFIG.mongoUri, {
+            serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+            connectTimeoutMS: 10000,
+        });
+
         log.info('🔌 Connected to MongoDB Atlas.');
         return true;
     } catch (error) {
