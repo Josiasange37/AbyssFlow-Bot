@@ -141,6 +141,9 @@ class LinkHandler {
                 { url: `https://bk9.site/download/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
                 { url: `https://bk9.site/download/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
                 { url: `https://api.agatz.xyz/api/instagram?url=${encodeURIComponent(finalUrl)}`, type: 'instagram' },
+                { url: `https://api.vreden.my.id/api/ytmp4?url=${encodeURIComponent(finalUrl)}`, type: 'youtube' },
+                { url: `https://api.agatz.xyz/api/ytv?url=${encodeURIComponent(finalUrl)}`, type: 'youtube' },
+                { url: `https://api.botcahx.eu.org/api/dowloader/ytv?url=${encodeURIComponent(finalUrl)}`, type: 'youtube' },
                 { url: `https://api.vreden.my.id/api/downloadv2?url=${encodeURIComponent(finalUrl)}`, type: 'general' }
             ];
 
@@ -149,7 +152,12 @@ class LinkHandler {
             let success = false;
 
             for (const api of apis) {
-                if (api.type !== 'general' && !finalUrl.toLowerCase().includes(api.type)) continue;
+                // Better type matching for YouTube/YouTu.be
+                const isMatch = api.type === 'general' ||
+                    finalUrl.toLowerCase().includes(api.type) ||
+                    (api.type === 'youtube' && finalUrl.toLowerCase().includes('youtu.be'));
+
+                if (!isMatch) continue;
 
                 try {
                     const response = await axios.get(api.url, { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } });
@@ -158,7 +166,7 @@ class LinkHandler {
                     videoMetadata.title = res.data?.title || res.result?.title || res.title || videoMetadata.title;
 
                     downloadUrl = res.data?.play || res.data?.hdplay || res.result?.url || res.result?.video || res.result?.hd ||
-                        res.data?.url || res.data?.video || res.url ||
+                        res.result?.download || res.data?.url || res.data?.video || res.url ||
                         (typeof res.result === 'string' && res.result.startsWith('http') ? res.result : null);
 
                     if (downloadUrl && typeof downloadUrl === 'string' && downloadUrl.startsWith('http')) {
