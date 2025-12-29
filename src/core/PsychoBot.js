@@ -1067,10 +1067,10 @@ class PsychoBot extends EventEmitter {
             this.metadataCache.set(chatId, { data: groupMetadata, time: Date.now() });
           }
 
-          participantsInfo = "\nUTILISATEURS DANS LE GROUPE (Tagge-les avec @Nom s'ils t'insultent ou si tu veux leur parler) : \n";
+          participantsInfo = "\n\n[SYSTEM_INFO - MEMBRES DU GROUPE (Référence uniquement, ce ne sont PAS des mentions actives)]:\n";
           groupMetadata.participants.forEach(p => {
             const name = p.id.split('@')[0];
-            participantsInfo += `@${name} `;
+            participantsInfo += `- ${name}\n`; // Use list format without @ to avoid confusion
             participantsMap.set(name.toLowerCase(), p.id);
           });
         } catch (e) { log.debug('Failed to get group metadata for context'); }
