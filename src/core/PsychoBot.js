@@ -1115,6 +1115,17 @@ class PsychoBot extends EventEmitter {
           return match;
         });
 
+        // --- NATIVE IMAGE DELIVERY ---
+        if (finalResponse.startsWith('[IMAGE]')) {
+          const imageUrl = finalResponse.replace('[IMAGE]', '').trim();
+          await simulateTyping(this.sock, chatId, 1000); // Short typing for image
+          await this.sendMessage(chatId, {
+            image: { url: imageUrl },
+            caption: "✨ Voici ton image générée par Psycho Bot :"
+          }, { quoted: message });
+          return;
+        }
+
         const typingDuration = calculateTypingDuration(finalResponse.length);
         await simulateTyping(this.sock, chatId, typingDuration);
         await this.sendMessage(chatId, {

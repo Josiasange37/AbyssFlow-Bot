@@ -496,19 +496,29 @@ class PsychoBrain {
 
         const finalText = text + searchContext;
 
-        // MULTIMODAL MODE: Use GitHub (GPT-4o-mini) for vision since Groq is text-only
+        // MULTIMODAL MODE: Use Mistral (Pixtral) for vision
         if (media) {
             try {
-                if (this.isProviderAvailable('github')) {
-                    response = await this.processGitHub(finalText, chatHistory, media);
-                    this.resetProviderHealth('github');
+                if (this.isProviderAvailable('mistral')) {
+                    response = await this.processMistral(finalText, chatHistory, media);
+                    this.resetProviderHealth('mistral');
                 } else {
-                    // Fallback if GitHub is unavailable (Groq/Mistral here are text-only)
-                    response = "Je ne peux pas analyser les images pour le moment (GitHub Vision indisponible).";
+                    // Fallback to GitHub if Mistral unavailable
+                    if (this.isProviderAvailable('github')) {
+                        response = await this.processGitHub(finalText, chatHistory, media);
+                        this.resetProviderHealth('github');
+                    } else {
+                        response = "Je ne peux pas analyser les images pour le moment (Mistral/GitHub indisponible).";
+                    }
                 }
             } catch (err) {
-                this.setProviderCooldown('github', err);
-                response = "Erreur lors de l'analyse de l'image.";
+                this.setProviderCooldown('mistral', err);
+                // Try GitHub as last resort
+                try {
+                    response = await this.processGitHub(finalText, chatHistory, media);
+                } catch (e) {
+                    response = "Erreur lors de l'analyse de l'image.";
+                }
             }
         } else {
             // TEXT MODE - Smart Fallback Chain
@@ -574,7 +584,7 @@ class PsychoBrain {
         }
 
         if (!response) {
-            return "Désolé bg, tous mes cerveaux sont en cooldown. Réessaie dans quelques minutes. 😵‍💫";
+            return "Oops, p'tit souci de connexion avec mes cerveaux AI. Réessaie dans 10 secondes ! 🧠�";
         }
 
         chatHistory.push({ role: "model", text: response });
@@ -648,8 +658,23 @@ class PsychoBrain {
      * - Web Search Premium: Real-time web search for current info
      * - Code Interpreter: Execute code and analyze data
      */
-    async processMistral(text, chatHistory = [], options = {}) {
+    async processMistral(text, chatHistory = [], media = null, options = {}) {
         if (!this.mistral) throw new Error('MISTRAL_NOT_INIT');
+
+        let userContent = text;
+        let modelToUse = 'mistral-large-latest';
+
+        // Handle Image Input (Pixtral)
+        if (media) {
+            const base64Image = media.buffer.toString('base64');
+            const dataUrl = `data:${media.mimetype};base64,${base64Image}`;
+            userContent = [
+                { type: "text", text: text || "Analyse cette image." },
+                { type: "image_url", imageUrl: dataUrl }
+            ];
+            modelToUse = 'pixtral-12b-2409'; // Use Pixtral for images
+            log.info('🖼️ Using Pixtral for image analysis');
+        }
 
         const messages = [
             { role: 'system', content: this.currentSystemPrompt || "Act like Psycho Bot." },
@@ -657,7 +682,7 @@ class PsychoBrain {
                 role: msg.role,
                 content: msg.message
             })),
-            { role: "user", content: text }
+            { role: "user", content: userContent }
         ];
 
         try {
@@ -666,7 +691,28 @@ class PsychoBrain {
                 { type: "image_generation" }
             ];
 
-            // Try beta conversations API with premium features
+            // Use standard chat.complete for Vision (Beta conversations might behave differently with images)
+            // But checking mistral docs, chat.complete is consistent.
+            // Let's stick to chat.complete for reliability with Vision as per documentation,
+            // OR use beta if we want tools. Pixtral supports tools?
+            // Safer to use standard chat completion for Vision to avoid complexity.
+
+            // However, the existing code used beta.conversations.start for tools.
+            // Let's try to use chat.complete if media is present (as Pixtral is often used there)
+            // AND chat.complete supports tools now too.
+
+            const response = await this.mistral.chat.complete({
+                model: modelToUse,
+                messages: messages,
+                tools: media ? undefined : tools, // Disable tools for vision to avoid conflict for now (keep it simple)
+                maxTokens: 1024
+            });
+
+            // Parse Standard Response (Chat Completion)
+            return response.choices[0].message.content;
+
+            /*
+            // BETA CONVERSATIONS (Old logic - commented out for reliability/vision switch)
             const response = await this.mistral.beta.conversations.start({
                 inputs: messages,
                 model: 'mistral-large-latest',
@@ -674,6 +720,7 @@ class PsychoBrain {
                 topP: 1,
                 tools: tools
             });
+            */
 
             console.log('DEBUG MISTRAL RAW:', JSON.stringify(response, null, 2));
 
@@ -760,12 +807,12 @@ class PsychoBrain {
                 for (const output of response.outputs) {
                     // Check direct image
                     if (output.type === 'image' && output.url) {
-                        return output.url;
+                        return `[IMAGE] ${output.url}`;
                     }
                     // Check nested in content
                     if (output.type === 'message.output' && Array.isArray(output.content)) {
                         for (const item of output.content) {
-                            if (item.type === 'image' && item.url) return item.url;
+                            if (item.type === 'image' && item.url) return `[IMAGE] ${item.url}`;
                         }
                     }
                 }
