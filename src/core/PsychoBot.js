@@ -922,7 +922,14 @@ class PsychoBot extends EventEmitter {
     const isTagMentioned = mentionedJids.some(jid => normalizeNumber(jid) === myNumber) ||
       (text && text.includes(`@${myNumber}`));
 
-    const isReplyToBot = contextInfo?.participant && normalizeNumber(contextInfo.participant) === myNumber;
+    // Enhanced Reply Check
+    let isReplyToBot = false;
+    if (contextInfo?.participant) {
+      const quotedSender = normalizeNumber(contextInfo.participant);
+      isReplyToBot = quotedSender === myNumber;
+      // Debug log for troubleshooting reply detection
+      // log.debug(`Reply Check: Quoted(${quotedSender}) vs Bot(${myNumber}) = ${isReplyToBot}`);
+    }
 
     const normalizedText = (text || '').toLowerCase();
     // Strict requirement: "bot" or "psycho" (to avoid false positives with owner name)
