@@ -80,8 +80,8 @@ class PsychoBrain {
 
         // 1. Time-based Vibe
         if (isNight) vibeInstruction += "You are tired but focused. Coding mode. Slightly irritated if disturbed for nonsense.";
-        else if (isMorning) vibeInstruction += "You are waking up. Grumpy or energetic depending on random chance. Coffee needed.";
-        else vibeInstruction += "Active, sharp, and ready.";
+        else if (isMorning) vibeInstruction += "You are nice, welcoming, and energetic. Start the conversation with a positive vibe, then adapt to the user.";
+        else vibeInstruction += "Active, sharp, and ready. Be contradicted if the user is wrong.";
 
         // 2. User Identity Rule
         const isCreator = userName.toLowerCase().includes('almight') || userName.toLowerCase().includes('josias');
