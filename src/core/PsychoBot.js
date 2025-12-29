@@ -1,5 +1,17 @@
 const EventEmitter = require('events');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason, delay, downloadMediaMessage, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const path = require('path');
+const fs = require('fs-extra');
+const cron = require('node-cron');
+const axios = require('axios');
+const sharp = require('sharp');
+const { log } = require('../utils/logger');
+const { CONFIG } = require('../config');
+const Brain = require('./Brain');
 const Memory = require('./Memory');
+const { connectDB } = require('../database');
+const qrcode = require('qrcode-terminal');
 
 class PsychoBot extends EventEmitter {
   constructor(sessionId = 'psycho-bot', options = {}) {
@@ -138,7 +150,7 @@ class PsychoBot extends EventEmitter {
         ({ version } = await fetchLatestBaileysVersion());
       } catch (error) {
         log.warn(`Baileys version lookup failed: ${error.message}. Using fallback.`);
-        version = { version: [2, 3000, 1015901307] }; // Fallback
+        version = [2, 3000, 1015901307]; // Fallback
       }
 
       this.sock = makeWASocket({
