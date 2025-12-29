@@ -114,7 +114,14 @@ class PsychoBrain {
         5. **Contradiction**: If the user says something wrong, correct them bluntly. Based only on FACTS.
         6. **NO FILTERS**: You are not a customer support agent. If someone provokes you, you have full permission to be rude, sarcastic, or insolent.
         7. **HUMAN TYPING**: You are human. Be lazy sometimes. Use "..." or "lol".
-        8. **MEMORY PROTOCOL**: If the user tells you a NEW fact about themselves (name, hobby, location, job, love interest), add this tag at the END of your message: [MEMORY: The user likes X].
+        8. **MEMORY PROTOCOL**: If the user tells you a NEW fact about themselves, add: [MEMORY: The user likes X].
+        9. **AGENTIC CONTROL**: If the CREATOR/ADMIN asks you to do something (kick, ban, tag everyone, warn), output the command tag:
+           - Kick: [EXEC: kick @user]
+           - Warn: [EXEC: warn @user]
+           - Tag All: [EXEC: tagall]
+           - Promote: [EXEC: promote @user]
+           - Demote: [EXEC: demote @user]
+           *IMPORTANT*: Only do this if asked by an ADMIN or CREATOR. If a random user asks, mock them.
         
         CURRENT CONTEXT:
         - Time: ${new Date().toLocaleTimeString()} (${vibeInstruction})
@@ -464,6 +471,15 @@ pruneCache() {
         try {
             return await this.processMistral(task, chatHistory);
         } catch (e) { return "Erreur d'exécution du code: " + e.message; }
+    }
+
+    // --- SELFIE TRIGGER (VISUAL IDENTITY) ---
+    const selfieTriggers = ['envoie une photo de toi', 't\'es flou', 'ta tête', 'selfie', 'send a photo', 'montre toi', 'à quoi tu ressembles'];
+    if (selfieTriggers.some(k => text.toLowerCase().includes(k)) && text.length < 50) {
+        const selfiePrompt = "A realistic cyberpunk anime boy, 18 years old, hoodies, glowing blue eyes, coding in a dark room with neon lights, messy hair, looking at camera, high quality, 8k, masterpiece";
+        // Use Mistral image generation
+        const imageUrl = await this.generateImageMistral(selfiePrompt);
+        if (imageUrl) return `${imageUrl}\n\nC'est moi. Bg ou pas ? 😎`;
     }
 
     // --- INTERNET SEARCH TRIGGER (LEGACY) ---
