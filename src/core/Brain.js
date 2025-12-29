@@ -8,6 +8,7 @@ const axios = require('axios');
 const { CONFIG } = require('../config');
 const fs = require('fs-extra');
 const path = require('path');
+const Memory = require('./Memory');
 
 /**
  * PsychoBrain - Advanced AI with Smart Provider Fallback
