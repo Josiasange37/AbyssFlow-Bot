@@ -206,9 +206,7 @@ class PsychoBrain {
             if (img) return `${img}\n\nC'est moi. Bg ou pas ? 😎`;
         }
 
-        // 4. Internet Context
-        let searchContext = "";
-        const searchKeywords = ['news', 'actualité', 'meteo', 'météo', 'bourse', 'score'];
+
         // 4. Internet Context
         let searchContext = "";
         const searchKeywords = ['news', 'actualité', 'meteo', 'météo', 'bourse', 'score'];
