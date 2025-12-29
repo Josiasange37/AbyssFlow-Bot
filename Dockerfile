@@ -27,5 +27,5 @@ ENV PORT=8080
 # Expose the API port
 EXPOSE 8080
 
-# Use api/bot.js as the entry point for cloud deployments
-CMD ["node", "api/bot.js"]
+# Use npm start to run the full Bot Factory (index.js)
+CMD ["npm", "start"]

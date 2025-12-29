@@ -1,4 +1,5 @@
 const EventEmitter = require('events');
+const Memory = require('./Memory');
 
 class PsychoBot extends EventEmitter {
   constructor(sessionId = 'psycho-bot', options = {}) {
@@ -20,7 +21,7 @@ class PsychoBot extends EventEmitter {
     };
     this.commandCount = 0;
     this.githubCache = { data: null, fetchedAt: 0 };
-    this.groupsDataPath = path.join(__dirname, '..', 'data', `groups_${this.sessionId}.json`);
+    this.groupsDataPath = path.join(process.cwd(), 'data', `groups_${this.sessionId}.json`);
     this.groupSettings = this.loadGroupSettings();
 
     // Message cache for tracking edits and deletions (max 1000 messages)
@@ -539,6 +540,19 @@ class PsychoBot extends EventEmitter {
       return null;
     }
     try {
+      // Human-like typing delay for text messages
+      if (content.text || typeof content === 'string') {
+        const text = content.text || content;
+        const charCount = text.length;
+        // Average typing speed: ~50ms per char + base processing time
+        // Min 1s, Max 8s to avoid being too slow
+        const delay = Math.min(Math.max(charCount * 40, 1000), 8000);
+
+        await this.sock.sendPresenceUpdate('composing', jid);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        await this.sock.sendPresenceUpdate('paused', jid);
+      }
+
       return await this.sock.sendMessage(jid, content, options);
     } catch (error) {
       if (error?.message === 'Connection Closed') {
@@ -557,11 +571,24 @@ class PsychoBot extends EventEmitter {
       const messageId = message.key.id;
       const chatId = message.key.remoteJid;
 
+      // Extract valid sender
+      const sender = message.key.participant || message.key.remoteJid;
+      if (!sender) return;
+
+      // --- MEMORY UPDATE ---
+      try {
+        const pushName = message.pushName || 'Inconnu';
+        Memory.updateUser(sender, { name: pushName });
+      } catch (e) { /* Ignore memory errors */ }
+
+      // Ignore self and broadcast
+      if (message.key.fromMe || sender === 'status@broadcast') return;
+
       // Store message data
       const cachedData = {
         id: messageId,
         chatId: chatId,
-        sender: message.key.participant || message.key.remoteJid,
+        sender: sender,
         timestamp: message.messageTimestamp || Date.now(),
         message: message.message,
         text: this.extractText(message),
@@ -1442,7 +1469,29 @@ class PsychoBot extends EventEmitter {
       }
     }, { timezone: "Africa/Douala" });
   }
+
+  async startAutoStatus() {
+    log.info('📱 Auto Status updates activated (Every 6h)');
+
+    // Cleanup existing
+    if (this.statusTask) this.statusTask.stop();
+
+    // Run every 6 hours (8am, 2pm, 8pm...)
+    this.statusTask = cron.schedule('0 */6 * * *', async () => {
+      log.info('📸 Generating new WhatsApp Status...');
+      if (Brain) {
+        const statusText = await Brain.generateStatus();
+        if (statusText) {
+          await this.sendMessage('status@broadcast', {
+            text: statusText,
+            backgroundColor: '#315558', // XyberClan Teal
+            font: 2 // Action Font
+          });
+        }
+      }
+    }, { timezone: "Africa/Douala" });
+  }
 }
 
 
-module.exports = PsychoBot;
+module.exports = { PsychoBot };

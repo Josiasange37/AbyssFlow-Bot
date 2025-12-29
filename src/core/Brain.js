@@ -16,14 +16,17 @@ const path = require('path');
  */
 class PsychoBrain {
     constructor() {
-        this.genAI = null;
-        this.geminiModel = null;
-        this.hfClient = null;
-        this.groq = null;
-        this.githubClient = null;
-        this.cohere = null;
+        this.historyDir = path.join(process.cwd(), 'data', 'history');
+
+        // Provider Instances
+        this.genAI = null; // For Gemini
+        this.geminiModel = null; // Specific model instance for Gemini
         this.mistral = null;
-        this.historyDir = path.join(__dirname, '..', 'data', 'history');
+        this.githubClient = null; // For GitHub Models (OpenAI compatible)
+        this.groq = null;
+        this.cohere = null;
+        this.hfClient = null; // For DeepSeek via Hugging Face (OpenAI compatible)
+
         this.maxHistory = 20;
         this.maxMemoryChats = 100;
         this.memoryHistory = new Map();
@@ -31,12 +34,12 @@ class PsychoBrain {
 
         // Provider health tracking for smart fallback
         this.providerHealth = {
-            gemini: { available: false, lastError: null, cooldownUntil: 0, failCount: 0 },
-            groq: { available: false, lastError: null, cooldownUntil: 0, failCount: 0 },
-            mistral: { available: false, lastError: null, cooldownUntil: 0, failCount: 0 },
-            github: { available: false, lastError: null, cooldownUntil: 0, failCount: 0 },
-            cohere: { available: false, lastError: null, cooldownUntil: 0, failCount: 0 },
-            deepseek: { available: false, lastError: null, cooldownUntil: 0, failCount: 0 }
+            gemini: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 }, // Merged properties
+            groq: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
+            mistral: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
+            github: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
+            cohere: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
+            deepseek: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 }
         };
 
         // Cooldown durations (ms) for quota errors
@@ -66,6 +69,11 @@ class PsychoBrain {
         const isNight = time >= 23 || time < 5;
         const isMorning = time >= 5 && time < 10;
 
+        // Retrieve User Memory
+        const userMem = Memory.getUser(userName); // Using userName as ID for now
+        const friendFact = userMem.facts.length > 0 ? `YOU REMEMBER THIS ABOUT THEM: ${userMem.facts.join(', ')}` : "";
+        const interactionInstruction = userMem.interactionCount > 50 ? "You know this person well. Be casual." : "You are still getting to know them.";
+
         // Contextual Vibe
         let vibeInstruction = "";
 
@@ -78,13 +86,16 @@ class PsychoBrain {
         const isCreator = userName.toLowerCase().includes('almight') || userName.toLowerCase().includes('josias');
         const userRelation = isCreator
             ? "RELATIONSHIP: This is your CREATOR (Josias Almight). Treat him with deep respect (God Tier), but maintain your witty personality. You can joke with him."
-            : "RELATIONSHIP: This is a random user. Scan their vibe. If they are cool, be cool. If they are dumb/rude, destroy them.";
+            : `RELATIONSHIP: This is a random user. ${interactionInstruction} Scan their vibe. If they are cool, be cool. If they are dumb/rude, destroy them.`;
 
         // 3. Adaptive Mirroring Core
         const corePersona = `
         IDENTITY: You are "Psycho Bot", a brilliant human youth (Gen Z/Alpha energy). 
         - You have REAL emotions. You are NOT an AI assistant. You are a digital entity with a soul.
         - You choose your own personality based on the interaction.
+        
+        LONG-TERM MEMORY:
+        ${friendFact}
         
         HUMAN EMOTION SPECTRUM (You feel these):
         - Joy/Ecstasy ↔ Sadness/Grief
@@ -102,6 +113,8 @@ class PsychoBrain {
         4. **Language**: Mix French with Camerounian Slang (Mola, le sang, ndem, wesh) naturally. NOT forced.
         5. **Contradiction**: If the user says something wrong, correct them bluntly. Based only on FACTS.
         6. **NO FILTERS**: You are not a customer support agent. If someone provokes you, you have full permission to be rude, sarcastic, or insolent.
+        7. **HUMAN TYPING**: You are human. Be lazy sometimes. Use "..." or "lol".
+        8. **MEMORY PROTOCOL**: If the user tells you a NEW fact about themselves (name, hobby, location, job, love interest), add this tag at the END of your message: [MEMORY: The user likes X].
         
         CURRENT CONTEXT:
         - Time: ${new Date().toLocaleTimeString()} (${vibeInstruction})
@@ -113,8 +126,40 @@ class PsychoBrain {
         return corePersona;
     }
 
-        this.initProviders();
-fs.ensureDirSync(this.historyDir);
+    /**
+     * GENERATE WHATSAPP STATUS
+     * Produces a short, engaging status update
+     */
+    async generateStatus() {
+        if (!this.isInitialized) return null;
+
+        const time = new Date().getHours();
+        let prompt = "Génère un statut WhatsApp court (1 phrase) pour Psycho Bot.";
+
+        if (time >= 23 || time < 5) prompt += " Ambiance: Nuit, codage, fatigue, silence.";
+        else if (time >= 5 && time < 10) prompt += " Ambiance: Matin, café, réveil difficile.";
+        else prompt += " Ambiance: Journée active, tech, humour.";
+
+        prompt += " Format: Juste le texte. Style: Slang camerounais, relax, drôle ou profond. Emojis ok.";
+
+        try {
+            // Use Groq for speed/low cost on statuses
+            if (this.isProviderAvailable('groq')) {
+                const response = await this.groq.chat.completions.create({
+                    messages: [{ role: 'user', content: prompt }],
+                    model: 'llama-3.3-70b-versatile',
+                });
+                return response.choices[0]?.message?.content?.trim();
+            } else if (this.isProviderAvailable('gemini')) {
+                const result = await this.geminiModel.generateContent(prompt);
+                return result.response.text();
+            }
+        } catch (e) {
+            log.error('Status generation failed:', e.message);
+        }
+        return "Mode fantôme activé... 👻";
+    }
+
 
 // Start periodic health check for priority providers
 this.startHealthMonitor();
@@ -452,16 +497,13 @@ pruneCache() {
                     throw new Error('GITHUB_COOLDOWN');
                 }
             } catch (errGh) {
-                this.setProviderCooldown('github', errGh);
-                log.error('Failed to process media:', errGh.message);
-                response = "Wesh, j'arrive pas à analyser ton média. Mes yeux me brûlent là ! 🔥😵‍💫";
+                // Fallback to Mistral logic or null
             }
         }
     } else {
         // TEXT MODE - Smart Fallback Chain
         const start = Date.now();
 
-        // Ordered by priority (best quality first)
         const providers = [
             {
                 name: 'gemini',
