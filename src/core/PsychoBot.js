@@ -28,6 +28,7 @@ class PsychoBot extends EventEmitter {
     this.messageCache = new Map();
     this.maxCacheSize = 1000;
     this.metadataCache = new Map(); // Cache for group participants
+    this.dramaTracker = new Map(); // Track message spikes for drama detection
 
     if (!CONFIG.owners.length) {
       log.warn(`[${this.sessionId}] No owners configured.`);
@@ -863,6 +864,34 @@ class PsychoBot extends EventEmitter {
     const sender = message.key.participant || message.key.remoteJid;
     const isGroup = chatId.endsWith('@g.us');
 
+    // --- DRAMA DETECTOR (Popcorn Mode) ---
+    if (isGroup && !message.key.fromMe) {
+      const now = Date.now();
+      let tracker = this.dramaTracker.get(chatId) || { count: 0, lastTime: now, cooldown: 0 };
+
+      // Reset if too much time passed (2s window)
+      if (now - tracker.lastTime > 2000) {
+        tracker.count = 0;
+      }
+
+      tracker.count++;
+      tracker.lastTime = now;
+
+      // Trigger if > 5 msg in 2 sec (Spike) AND not in cooldown
+      if (tracker.count > 6 && now > tracker.cooldown) {
+        log.info(`🍿 DRAMA DETECTED in ${chatId}`);
+        // Send random drama reaction
+        const reactions = ["🍿", "👀", "🔥", "☕"];
+        const reaction = reactions[Math.floor(Math.random() * reactions.length)];
+
+        await this.sendMessage(chatId, { text: reaction });
+
+        tracker.cooldown = now + 60000; // 1 min cooldown
+        tracker.count = 0;
+      }
+      this.dramaTracker.set(chatId, tracker);
+    }
+
     // --- SELECTIVE MUTE: Enforcement ---
     if (isGroup && this.mutedUsers && this.mutedUsers.has(chatId)) {
       const mutedList = this.mutedUsers.get(chatId);
@@ -1015,8 +1044,50 @@ class PsychoBot extends EventEmitter {
         } catch (e) { log.debug('Failed to get group metadata for context'); }
       }
 
-      const response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media);
+      let response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media);
+
       if (response) {
+        // --- AGENTIC EXECUTION PROTOCOL ---
+        if (response.includes('[EXEC:')) {
+          const execMatch = response.match(/\[EXEC: (.*?)\]/);
+          if (execMatch && execMatch[1]) {
+            const execStr = execMatch[1];
+            const [cmdName, ...cmdArgs] = execStr.split(' ');
+
+            // SECURITY CHECK: Only allow if sender is Owner or Admin
+            // We need to fetch basic info again or assume passed 'canUseAdminCommands' is not available here.
+            // Re-calculating safety
+            const isGroup = chatId.endsWith('@g.us');
+            let isAuthorized = CONFIG.owners.includes(sender.replace('@s.whatsapp.net', ''));
+
+            if (!isAuthorized && isGroup) {
+              try {
+                const metadata = await this.sock.groupMetadata(chatId);
+                const participant = metadata.participants.find(p => p.id === sender);
+                isAuthorized = participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
+              } catch (e) { }
+            }
+
+            if (isAuthorized) {
+              log.info(`🤖 AGENTIC EXECUTION: ${cmdName} by ${sender}`);
+              const plugin = this.commands.get(cmdName.toLowerCase());
+              if (plugin) {
+                // Mocking message object slightly or just running logic
+                // Ideally we invoke 'handleCommand' but avoiding circular logic
+                try {
+                  await plugin.execute(this.sock, message, cmdArgs, this);
+                  // Remove tag from response
+                  response = response.replace(/\[EXEC: .*?\]/, '').trim();
+                } catch (execErr) {
+                  response += `\n(⚠️ Echec de l'agent: ${execErr.message})`;
+                }
+              }
+            } else {
+              response = response.replace(/\[EXEC: .*?\]/, '').trim();
+            }
+          }
+        }
+
         // --- POST-PROCESS MENTIONS: Convert @Name to actual mentions ---
         const mentionedJids = [];
         const finalResponse = response.replace(/@(\w+)/g, (match, name) => {
@@ -1494,4 +1565,4 @@ class PsychoBot extends EventEmitter {
 }
 
 
-module.exports = { PsychoBot };
+module.exports = PsychoBot;
