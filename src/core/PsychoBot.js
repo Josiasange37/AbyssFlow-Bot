@@ -939,7 +939,7 @@ class PsychoBot extends EventEmitter {
       // log.debug(`Reply Check: Quoted(${quotedSender}) vs Bot(${myNumber}) = ${isReplyToBot}`);
     }
 
-    const normalizedText = (text || '').toLowerCase();
+
     // Strict requirement: "bot" or "psycho" (to avoid false positives with owner name)
     const isNameMentioned = normalizedText.includes('bot') ||
       normalizedText.includes('psycho');
@@ -1134,11 +1134,14 @@ class PsychoBot extends EventEmitter {
           return;
         }
 
+        // Detect mentions in AI response (basic check) or default to sender
+        const responseMentions = [sender, ...mentionedJids];
+
         const typingDuration = calculateTypingDuration(finalResponse.length);
         await simulateTyping(this.sock, chatId, typingDuration);
         await this.sendMessage(chatId, {
           text: finalResponse,
-          mentions: mentionedJids
+          mentions: responseMentions
         }, { quoted: message });
       }
       return;
