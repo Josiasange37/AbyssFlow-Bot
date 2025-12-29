@@ -257,7 +257,7 @@ class PsychoBrain {
         // 7. Store Significant Interactions in Long-Term Memory
         await Memory.storeLongTerm(text, response, userName);
 
-        chatHistory.push({ role: "model", text: response });
+        chatHistory.push({ role: "assistant", text: response });
         await this.saveHistory(chatId, chatHistory);
         return response;
     }
