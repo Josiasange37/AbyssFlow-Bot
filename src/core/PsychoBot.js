@@ -7,6 +7,7 @@ const cron = require('node-cron');
 const axios = require('axios');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { normalizeNumber } = require('../utils/helpers');
 const { CONFIG } = require('../config');
 const Brain = require('./Brain');
 const Memory = require('./Memory');
