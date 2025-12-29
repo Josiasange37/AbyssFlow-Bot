@@ -872,7 +872,7 @@ class PsychoBrain {
             { role: "system", content: this.systemPrompt },
             ...chatHistory.map(msg => ({
                 role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.text
+                content: msg.text || ""
             })),
             { role: "user", content: text }
         ];
