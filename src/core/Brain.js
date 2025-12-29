@@ -662,6 +662,11 @@ class PsychoBrain {
         ];
 
         try {
+            const tools = [
+                { type: "web_search_premium" },
+                { type: "image_generation" }
+            ];
+
             // Try beta conversations API with premium features
             const response = await this.mistral.beta.conversations.start({
                 inputs: messages,
