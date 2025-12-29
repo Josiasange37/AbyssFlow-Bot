@@ -18,6 +18,8 @@ const UserStats = require('../database/models/UserStats');
 const useMongoAuthState = require('./mongoAuth');
 const qrcode = require('qrcode-terminal');
 
+const baileysLogger = pino({ level: 'silent' });
+
 class PsychoBot extends EventEmitter {
   constructor(sessionId = 'psycho-bot', options = {}) {
     super();
