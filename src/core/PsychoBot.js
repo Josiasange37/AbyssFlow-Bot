@@ -921,22 +921,16 @@ class PsychoBot extends EventEmitter {
     const mentionedJids = contextInfo?.mentionedJid || [];
     const normalizedText = (text || '').toLowerCase();
 
-    // Trigger Logic
+    // Trigger Logic: Broad Match to fix "Empty Mention List" bugs
+    // Checks: 1. Is JID in mention list? 2. Is Number in text (@237...)? 3. Is raw ID (without domain) in text?
     const isTagMentioned = mentionedJids.some(jid => normalizeNumber(jid) === myNumber) ||
-      (text && text.includes(`@${myNumber}`));
-
-    // Debug Mention logic if mention is suspected but not triggered
-    if (text && text.includes('@') && !isTagMentioned) {
-      // log.debug(`Potential mention ignored. MyNum: ${myNumber}, Mentions: ${JSON.stringify(mentionedJids)}`);
-    }
+      (text && (text.includes(`@${myNumber}`) || text.includes(`@${myJid.split('@')[0]}`)));
 
     // Enhanced Reply Check
     let isReplyToBot = false;
     if (contextInfo?.participant) {
       const quotedSender = normalizeNumber(contextInfo.participant);
-      isReplyToBot = quotedSender === myNumber;
-      // Debug log for troubleshooting reply detection
-      // log.debug(`Reply Check: Quoted(${quotedSender}) vs Bot(${myNumber}) = ${isReplyToBot}`);
+      isReplyToBot = (quotedSender === myNumber);
     }
 
 
