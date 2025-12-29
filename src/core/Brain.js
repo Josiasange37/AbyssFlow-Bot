@@ -180,12 +180,12 @@ class PsychoBrain {
     }
 
     // --- MAIN PROCESS ---
-    async process(text, chatId = 'global', media = null, userName = 'User') {
+    async process(text, chatId = 'global', media = null, userName = 'User', availableCommands = "") {
         if (!this.isInitialized) return "Brain offline (Init failed).";
 
         // 1. Get Memory & System Prompt
         const memories = Memory.retrieveRelevant(text);
-        const systemPrompt = Persona.generateSystemPrompt(userName) + memories;
+        const systemPrompt = Persona.generateSystemPrompt(userName, availableCommands) + memories;
         const chatHistory = await this.getHistory(chatId);
 
         // 2. Special Commands (Mistral Routing)
