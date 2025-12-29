@@ -14,6 +14,7 @@ const Brain = require('./Brain');
 const Memory = require('./Memory');
 const { connectDB } = require('../database');
 const GroupSettings = require('../database/models/GroupSettings');
+const UserStats = require('../database/models/UserStats');
 const useMongoAuthState = require('./mongoAuth');
 const qrcode = require('qrcode-terminal');
 
