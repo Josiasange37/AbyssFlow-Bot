@@ -167,10 +167,11 @@ class PsychoBrain {
     }
 
     async searchInternet(query) {
-        if (!CONFIG.keys.search) return null;
+        const searchKey = CONFIG.searchApiKey || CONFIG.keys?.search;
+        if (!searchKey) return null;
         try {
             const response = await axios.get('https://serpapi.com/search', {
-                params: { q: query, api_key: CONFIG.keys.search, engine: 'google', num: 3 }, timeout: 5000
+                params: { q: query, api_key: searchKey, engine: 'google', num: 3 }, timeout: 5000
             });
             const results = response.data.organic_results;
             if (results?.length > 0) return results.map(r => `[${r.title}] ${r.snippet}`).join('\n');
@@ -208,7 +209,11 @@ class PsychoBrain {
         // 4. Internet Context
         let searchContext = "";
         const searchKeywords = ['news', 'actualité', 'meteo', 'météo', 'bourse', 'score'];
-        if (CONFIG.keys.search && !media && searchKeywords.some(k => text.toLowerCase().includes(k))) {
+        // 4. Internet Context
+        let searchContext = "";
+        const searchKeywords = ['news', 'actualité', 'meteo', 'météo', 'bourse', 'score'];
+        const searchKey = CONFIG.searchApiKey || CONFIG.keys?.search;
+        if (searchKey && !media && searchKeywords.some(k => text.toLowerCase().includes(k))) {
             const results = await this.searchInternet(text);
             if (results) searchContext = `\n\n[INFO LIVE WEB]:\n${results}`;
         }
