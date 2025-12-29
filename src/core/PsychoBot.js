@@ -1100,13 +1100,25 @@ class PsychoBot extends EventEmitter {
               log.info(`🤖 AGENTIC EXECUTION: ${cmdName} by ${sender}`);
               const plugin = this.commands.get(cmdName.toLowerCase());
               if (plugin) {
-                // Mocking message object slightly or just running logic
-                // Ideally we invoke 'handleCommand' but avoiding circular logic
                 try {
-                  await plugin.execute(this.sock, message, cmdArgs, this);
+                  // PASS OBJECT TO MATCH STANDARD COMMAND SIGNATURE
+                  await plugin.execute({
+                    sock: this.sock,
+                    chatId,
+                    message,
+                    args: cmdArgs,
+                    isOwner: CONFIG.owners.includes(sender.replace('@s.whatsapp.net', '')),
+                    isAdmin: isAuthorized,
+                    isGroupAdmin: isAuthorized, // simplification for autonomous execution
+                    isGroup,
+                    sender,
+                    bot: this,
+                    config: CONFIG
+                  });
                   // Remove tag from response
                   response = response.replace(/\[EXEC: .*?\]/, '').trim();
                 } catch (execErr) {
+                  log.error(`Agentic execution error: ${execErr.message}`);
                   response += `\n(⚠️ Echec de l'agent: ${execErr.message})`;
                 }
               }
