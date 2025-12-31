@@ -83,7 +83,27 @@ class PsychoBot extends EventEmitter {
     }
   }
 
+  /**
+   * Status Update Handler for STALKER (Phase 11)
+   */
+  async onPresenceUpdate(update) {
+    const { id, presences } = update;
+    if (!this.stalkerList || !this.stalkerList.has(id)) return;
+
+    // The 'presences' object contains statuses for various platforms, find the newest
+    const presenceData = Object.values(presences)[0];
+    if (!presenceData) return;
+
+    const status = presenceData.lastKnownPresence || presenceData.type;
+    const alertText = `👁️ *STALKER ALERT:* @${id.split('@')[0]} est désormais *${status.toUpperCase()}*.`;
+
+    // Find owner JID
+    const ownerJid = CONFIG.owners[0] + '@s.whatsapp.net';
+    await this.sock.sendMessage(ownerJid, { text: alertText, mentions: [id] });
+  }
+
   getGroupSettings(groupId) {
+
     if (!this.groupSettings.groups[groupId]) {
       this.groupSettings.groups[groupId] = {
         welcome: {
@@ -200,6 +220,8 @@ class PsychoBot extends EventEmitter {
       this.sock.ev.on('messages.upsert', (payload) => this.onMessages(payload));
       this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
+      this.sock.ev.on('presence.update', (update) => this.onPresenceUpdate(update));
+
 
       this.pendingReconnect = false;
       log.info('Socket initialized.');
@@ -920,7 +942,22 @@ class PsychoBot extends EventEmitter {
       return; // Complete ignorance
     }
 
+    // --- BLACKOUT: Targeted Media Blockage (Phase 11) ---
+    if (this.blackoutList && this.blackoutList.has(sender) && !this.isOwner(sender)) {
+      const isMedia = message.message?.imageMessage || message.message?.videoMessage || message.message?.audioMessage || message.message?.documentMessage;
+      if (isMedia) {
+        (async () => {
+          try {
+            await this.sock.sendMessage(chatId, { delete: message.key });
+            log.info(`🌑 BLACKOUT: Neutralized media from ${sender}`);
+          } catch (e) { }
+        })();
+        return; // Stop processing
+      }
+    }
+
     // --- WATCHDOG: Global Surveillance Alert (Phase 10) ---
+
     if (this.watchdogList && this.watchdogList.has(sender) && !message.key.fromMe) {
       (async () => {
         const groupName = isGroup ? (await this.sock.groupMetadata(chatId)).subject : 'DM';
@@ -1555,7 +1592,18 @@ class PsychoBot extends EventEmitter {
       log.warn(`🤖 ANTI-BOT: Potential bot detected from ${sender} (Prefix match)`);
     }
 
+    // --- AUTO-PURGE: Zero Tolerance (Phase 11) ---
+    if (this.autoPurgeChats && this.autoPurgeChats.has(chatId)) {
+      const hasLink = text && (text.includes('http://') || text.includes('https://') || text.includes('wa.me/'));
+      if (hasLink) {
+        log.warn(`🛡️ AUTO-PURGE: Unauthorized link from ${sender} in ${chatId}`);
+        await this.neutralizeThreat(chatId, sender, message, "Auto-Purge: Unauthorized Content (Link)");
+        return false;
+      }
+    }
+
     return true;
+
 
   }
 
