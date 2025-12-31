@@ -1113,9 +1113,20 @@ class PsychoBot extends EventEmitter {
 
     const isDM = !isGroup;
 
-    // Sovereign Rule: AI only responds to Direct Interaction (Tag/Reply/DM)
-    // Removed isNameMentioned check to avoid "script kiddie" pings in middle of conversation.
-    const isBotTriggered = isTagMentioned || isReplyToBot || isDM;
+    // Sovereign Assistant Rule (Passive Assistance)
+    const normalizedText = (text || '').toLowerCase();
+    const isNameMentioned = text && (
+      normalizedText.includes(this.botName.toLowerCase()) ||
+      normalizedText.includes('psycho') ||
+      normalizedText.includes('bot')
+    );
+
+    // AI only responds to Direct Interaction or Name Mention in groups
+    const isBotTriggered = isTagMentioned || isReplyToBot || isDM || (isGroup && isNameMentioned);
+
+    if (isGroup && LOG_THRESHOLD >= LOG_LEVEL_MAP.debug) {
+      log.debug(`[Group] Msg: "${text}" | Triggered: ${isBotTriggered} (Tag: ${isTagMentioned}, Reply: ${isReplyToBot}, Name: ${isNameMentioned})`);
+    }
 
     // --- DM SHIELD: QUARANTINE PROTOCOL (Phase 5) ---
     if (isDM && this.dmShield && !isOwner && !message.key.fromMe) {
