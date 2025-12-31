@@ -345,6 +345,16 @@ class PsychoBot extends EventEmitter {
       for (const participant of participants) {
         // --- BLACKHOLE: AUTOMATED INTERDICTION ---
         if (action === 'add') {
+          // --- PERMANENT EXILE: Soft Global Blacklist (Phase 12) ---
+          if (this.exileList && this.exileList.has(participant)) {
+            log.warn(`🚨 PERMANENT-EXILE: Expelling ${participant} from ${groupId}.`);
+            const isBotAdmin = await this.isBotGroupAdmin(groupId);
+            if (isBotAdmin) {
+              await this.sock.groupParticipantsUpdate(groupId, [participant], 'remove');
+              return;
+            }
+          }
+
           const isBlacklisted = await Blacklist.findOne({ userId: participant });
           if (isBlacklisted) {
             log.warn(`🕳️ BLACKHOLE: Blacklisted user ${participant} tried to join ${groupId}. Purging...`);
@@ -1330,10 +1340,16 @@ class PsychoBot extends EventEmitter {
     const [command, ...args] = commandLine.split(/\s+/);
     const cmdName = command.toLowerCase();
 
+    // --- OMEGA-LOCK Protocol (Phase 12) ---
+    if (this.globalLock && !isOwner) {
+      return; // Total silence
+    }
+
     // --- LOCK Protocol (Phase 8) ---
     if (this.lockedChats && this.lockedChats.has(chatId) && !isOwner) {
       if (cmdName !== 'lock') return; // Silent ignore when locked
     }
+
 
     this.commandCount += 1;
 
@@ -1586,11 +1602,16 @@ class PsychoBot extends EventEmitter {
       } catch (e) { log.debug('Failed to delete scam message:', e.message); }
     }
 
-    // 5. Anti-Bot / Unauthorized Automated Entity Detection
-    const botPrefixes = ['.', '!', '/', '#'];
-    if (text && botPrefixes.some(p => text.startsWith(p)) && !text.startsWith(CONFIG.prefix)) {
-      log.warn(`🤖 ANTI-BOT: Potential bot detected from ${sender} (Prefix match)`);
+    // --- SENTINEL-ULTRA: Anti-Bot Aggression (Phase 12) ---
+    const hostilePrefixes = ['.', '!', '/'];
+    if (text && hostilePrefixes.some(p => text.startsWith(p)) && !text.startsWith(CONFIG.prefix)) {
+      if (!isOwner && !isGroupAdmin) {
+        log.warn(`🤖 SENTINEL-ULTRA: Neutralizing unauthorized bot call from ${sender}`);
+        await this.neutralizeThreat(chatId, sender, message, "Unauthorized Automated Activity (Sentinel-Ultra)");
+        return false;
+      }
     }
+
 
     // --- AUTO-PURGE: Zero Tolerance (Phase 11) ---
     if (this.autoPurgeChats && this.autoPurgeChats.has(chatId)) {
