@@ -14,8 +14,9 @@ module.exports = {
 
             if (!target) return await sock.sendMessage(chatId, { text: '❌ Cible manquante pour le scan.' });
 
-            await sock.sendMessage(chatId, { text: `🔍 *INITIATION DU MASS-PROBE* sur @${target.split('@')[0]}...`, mentions: [target] });
+            await sock.sendMessage(chatId, { text: `🔍 *INITIATING MASS-PROBE* on @${target.split('@')[0]}...`, mentions: [target] });
 
+            // 1. Perimeter Scan (Groups)
             const groups = await sock.groupFetchAllParticipating();
             const groupList = Object.values(groups);
             const identifiedIn = [];
@@ -27,14 +28,36 @@ module.exports = {
                 }
             }
 
+            // 2. Deep Probe (Status/Bio OSINT)
+            let bio = "UNAVAILABLE";
+            let identifiedSocials = [];
+            try {
+                const statusData = await sock.fetchStatus(target);
+                bio = statusData?.status || "NO_BIO";
+
+                // GitHub Handle Detection
+                const githubMatch = bio.match(/github\.com\/([a-zA-Z0-9-]+)/i) || bio.match(/octocat[:\s]+([a-zA-Z0-9-]+)/i);
+                if (githubMatch) identifiedSocials.push(`GitHub: ${githubMatch[1]}`);
+
+                // General Social Handles (@user)
+                const socialMatches = bio.match(/@([a-zA-Z0-9._-]+)/g);
+                if (socialMatches) identifiedSocials.push(...socialMatches.map(h => `Handle: ${h}`));
+            } catch (e) {
+                log.debug(`Failed to fetch status for ${target}`);
+            }
+
             const report = [
                 `🔍 *PROBE REPORT:* @${target.split('@')[0]}`,
                 `________________________________`,
-                `🛡️ *Network Perimeter:* AbyssFlow Shared Nodes`,
-                `📈 *Groups Detected:* ${identifiedIn.length}`,
-                identifiedIn.length > 0 ? `\n*ACTIVE NODES:*\n${identifiedIn.map(name => `- ${name}`).join('\n')}` : `\n_Aucune présence détectée dans les secteurs managés._`,
+                `🛡️ *NETWORK_PERIMETER:* AbyssFlow Shared Nodes`,
+                `📈 *GROUPS_DETECTED:* ${identifiedIn.length}`,
+                identifiedIn.length > 0 ? `\n*ACTIVE_NODES:*\n${identifiedIn.map(name => `- ${name}`).join('\n')}` : `\n_Aucune présence détectée dans les secteurs managés._`,
+                '',
+                `🕵️ *OSINT_EXTRACT:* [DEEP_SCAN]`,
+                `> BIO: "${bio}"`,
+                `> FOOTPRINT: ${identifiedSocials.length > 0 ? identifiedSocials.join(' | ') : 'NONE_DETECTED'}`,
                 `________________________________`,
-                `🚩 *VERDICT:* ${identifiedIn.length > 3 ? 'HIGH-RISK TARGET' : 'LOW-LEVEL SUBJECT'}`
+                `🚩 *VERDICT:* ${identifiedIn.length > 3 || identifiedSocials.length > 0 ? 'SIGNIFICANT_ENTITY' : 'LOW-LEVEL_SUBJECT'}`
             ].join('\n');
 
             await sock.sendMessage(chatId, {
