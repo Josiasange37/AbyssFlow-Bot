@@ -48,6 +48,7 @@ class PsychoBot extends EventEmitter {
     this.maxCacheSize = 1000;
     this.metadataCache = new Map(); // Cache for group participants
     this.dramaTracker = new Map(); // Track message spikes for drama detection
+    this.cloakMode = false; // Phase 2: Stealth Cloaking
 
     if (!CONFIG.owners.length) {
       log.warn(`[${this.sessionId}] No owners configured.`);
@@ -56,7 +57,10 @@ class PsychoBot extends EventEmitter {
     this.loadCommands();
     // Use session-scoped DB connection if needed or share the global one
     connectDB().catch(e => log.error(`[${this.sessionId}] DB Init Error:`, e.message));
+    this.startAutoStatus();
+    this.startGhostCore();
   }
+
 
   loadGroupSettings() {
     try {
@@ -314,9 +318,36 @@ class PsychoBot extends EventEmitter {
 
       if (!groupId || !participants || !participants.length) return;
 
-      const settings = await this.getGroupSettings(groupId);
+      const Blacklist = require('../database/models/Blacklist');
 
       for (const participant of participants) {
+        // --- BLACKHOLE: AUTOMATED INTERDICTION ---
+        if (action === 'add') {
+          const isBlacklisted = await Blacklist.findOne({ userId: participant });
+          if (isBlacklisted) {
+            log.warn(`🕳️ BLACKHOLE: Blacklisted user ${participant} tried to join ${groupId}. Purging...`);
+            const isBotAdmin = await this.isBotGroupAdmin(groupId);
+            if (isBotAdmin) {
+              await this.sock.groupParticipantsUpdate(groupId, [participant], 'remove');
+              await this.sendMessage(groupId, { text: `🕳️ *BLACKHOLE TRIGGERED:* La cible @${participant.split('@')[0]} est bannie de tous les secteurs AbyssFlow. \n\n*Raison:* ${isBlacklisted.reason}`, mentions: [participant] });
+              continue; // Skip further processing for this user
+            }
+          }
+        }
+
+        // --- OVERRIDE: ADMIN ENFORCEMENT ---
+        if (this.overrideGroups && this.overrideGroups.has(groupId) && !this.isOwner(participant)) {
+          if (action === 'promote' || action === 'demote') {
+            log.warn(`🦾 OVERRIDE: Unauthorized admin change detected for ${participant} in ${groupId}. Reverting...`);
+            const isBotAdmin = await this.isBotGroupAdmin(groupId);
+            if (isBotAdmin) {
+              const reverseAction = action === 'promote' ? 'demote' : 'promote';
+              await this.sock.groupParticipantsUpdate(groupId, [participant], reverseAction);
+              await this.sendMessage(groupId, { text: `🦾 *OVERRIDE ACTIVÉ:* Action de privilège non autorisée pour @${participant.split('@')[0]} annulée.`, mentions: [participant] });
+            }
+          }
+        }
+
         // Check for antibot when someone is added
         if (action === 'add') {
           // Check if antibot is enabled
@@ -555,13 +586,17 @@ class PsychoBot extends EventEmitter {
    * Safe sendMessage wrapper that checks connection status
    */
   async sendMessage(jid, content, options = {}) {
-    if (!this.sock) {
-      log.warn(`Cannot send message to ${jid}: Socket not connected.`);
-      return null;
-    }
+    if (!this.sock) return null;
     try {
-      // Human-like typing delay for text messages
-      // Typing delay removed for speed - handled by caller or plugins if needed
+      // --- GHOST PROTOCOL: Human-Like Presence (Phase 9) ---
+      if (!this.cloakMode && !options.noDelay) {
+        const delayTime = Math.floor(Math.random() * 1500) + 800; // 0.8s - 2.3s
+        const status = content.audio ? 'recording' : 'composing';
+
+        await this.sock.sendPresenceUpdate(status, jid);
+        await delay(delayTime);
+        await this.sock.sendPresenceUpdate('paused', jid);
+      }
 
       return await this.sock.sendMessage(jid, content, options);
     } catch (error) {
@@ -874,6 +909,29 @@ class PsychoBot extends EventEmitter {
     const userName = message.pushName || 'Inconnu';
     const isGroup = chatId.endsWith('@g.us');
 
+    // --- GHOST PROTOCOL: Anti-Ban Mark-as-Read (Phase 9) ---
+    if (!message.key.fromMe && !this.cloakMode) {
+      await this.sock.readMessages([message.key]);
+    }
+
+
+    // --- SHADOW BAN: TOTAL GHOSTING (Phase 5) ---
+    if (this.shadowBannedUsers && this.shadowBannedUsers.has(sender) && !this.isOwner(sender)) {
+      return; // Complete ignorance
+    }
+
+    // --- WATCHDOG: Global Surveillance Alert (Phase 10) ---
+    if (this.watchdogList && this.watchdogList.has(sender) && !message.key.fromMe) {
+      (async () => {
+        const groupName = isGroup ? (await this.sock.groupMetadata(chatId)).subject : 'DM';
+        const alertText = `👁️ *WATCHDOG ALERT:* @${sender.split('@')[0]} a été détecté dans *${groupName}*.\n\n📖 *Message:* ${text || '[Media]'}`;
+        // Find owner JID
+        const ownerJid = CONFIG.owners[0] + '@s.whatsapp.net';
+        await this.sock.sendMessage(ownerJid, { text: alertText, mentions: [sender] });
+      })();
+    }
+
+
     // --- DRAMA DETECTOR (Popcorn Mode) ---
     if (isGroup && !message.key.fromMe) {
       const now = Date.now();
@@ -933,6 +991,34 @@ class PsychoBot extends EventEmitter {
       }
     }
 
+    // --- PARALYZE: Social Vacuum (Phase 4/5) ---
+    if (this.paralyzedUsers && this.paralyzedUsers.has(chatId)) {
+      const paralyzedList = this.paralyzedUsers.get(chatId);
+      if (paralyzedList.has(sender) && !message.key.fromMe) {
+        log.info(`Paralyzed user ${sender} sent message in ${chatId}. Redacting...`);
+        await this.sock.sendMessage(chatId, {
+          edit: message.key,
+          text: '🔇 [ CONTENU NEUTRALISÉ PAR LE CLAN ABYSSFLOW ]'
+        });
+        return;
+      }
+    }
+
+    // --- VEX: Automated Harassment (Phase 4/5) ---
+    if (this.vexedUsers && this.vexedUsers.has(chatId)) {
+      const vexedList = this.vexedUsers.get(chatId);
+      if (vexedList.has(sender) && !message.key.fromMe && !text?.startsWith(CONFIG.prefix)) {
+        log.info(`Vexed user ${sender} sent message in ${chatId}. Triggering AI Roast...`);
+        (async () => {
+          const roast = await Brain.process(`[VEX PROTOCOL] L'utilisateur @${sender.split('@')[0]} a encore parlé. Fais lui un roast technique ultra humiliant car il est dans la blacklist.`, chatId, null, "Auditeur");
+          if (roast) {
+            await this.sendMessage(chatId, { text: `💀 *HUMILIATION PROTOCOLAIRE* 💀\n\n${roast}`, mentions: [sender] }, { quoted: message });
+          }
+        })();
+      }
+    }
+
+
     const isOwner = this.isOwner(sender);
 
     // Robust Context Extraction
@@ -963,6 +1049,17 @@ class PsychoBot extends EventEmitter {
     const isDM = !isGroup;
 
     const isBotTriggered = isTagMentioned || isReplyToBot || isDM || (isGroup && isNameMentioned);
+
+    // --- DM SHIELD: QUARANTINE PROTOCOL (Phase 5) ---
+    if (isDM && this.dmShield && !isOwner && !message.key.fromMe) {
+      const scamPatterns = [/wa\.me\/settings/i, /free-robux/i, /bit\.ly/i, /gift-card/i, /tinyurl/i];
+      if (text && scamPatterns.some(p => p.test(text))) {
+        log.warn(`🛡️ QUARANTINE: Scam link detected in DM from ${sender}. Blocking...`);
+        await this.sendMessage(sender, { text: '🛡️ *QUARANTINE PROTOCOL TRIGGERED:* Votre comportement est jugé hostile. Accès révoqué.' });
+        await this.sock.updateBlockStatus(sender, 'block');
+        return;
+      }
+    }
 
     // Link Detection (Auto-Banner & Video Download)
     const urlPattern = /https?:\/\/[^\s]+/;
@@ -1071,7 +1168,7 @@ class PsychoBot extends EventEmitter {
 
       // --- AI CONTEXT ENHANCEMENT: Group Participants ---
       // Immediate feedback: Show typing status while processing
-      await this.sock.sendPresenceUpdate('composing', chatId);
+      if (!this.cloakMode) await this.sock.sendPresenceUpdate('composing', chatId);
 
       let participantsInfo = "";
       let participantsMap = new Map();
@@ -1167,7 +1264,7 @@ class PsychoBot extends EventEmitter {
         // --- NATIVE IMAGE DELIVERY ---
         if (finalResponse.startsWith('[IMAGE]')) {
           const imageUrl = finalResponse.replace('[IMAGE]', '').trim();
-          await simulateTyping(this.sock, chatId, 1000); // Short typing for image
+          if (!this.cloakMode) await simulateTyping(this.sock, chatId, 1000);
           await this.sendMessage(chatId, {
             image: { url: imageUrl },
             caption: "✨ Voici ton image générée par Psycho Bot :"
@@ -1178,8 +1275,10 @@ class PsychoBot extends EventEmitter {
         // Detect mentions in AI response (basic check) or default to sender
         const responseMentions = [sender, ...mentionedJids];
 
-        const typingDuration = calculateTypingDuration(finalResponse.length);
-        await simulateTyping(this.sock, chatId, typingDuration);
+        if (!this.cloakMode) {
+          const typingDuration = calculateTypingDuration(finalResponse.length);
+          await simulateTyping(this.sock, chatId, typingDuration);
+        }
         await this.sendMessage(chatId, {
           text: finalResponse,
           mentions: responseMentions
@@ -1193,9 +1292,42 @@ class PsychoBot extends EventEmitter {
   async handleCommand(chatId, message, commandLine, canUseAdminCommands, isOwner, isGroupAdmin, isGroup, sender) {
     const [command, ...args] = commandLine.split(/\s+/);
     const cmdName = command.toLowerCase();
+
+    // --- LOCK Protocol (Phase 8) ---
+    if (this.lockedChats && this.lockedChats.has(chatId) && !isOwner) {
+      if (cmdName !== 'lock') return; // Silent ignore when locked
+    }
+
     this.commandCount += 1;
 
-    // Check if command exists in plugins
+    // --- GHOST PROTOCOL: Anti-Spam Burst Protection (Phase 9) ---
+    if (!isOwner) {
+      if (!this.commandBurst) this.commandBurst = new Map();
+      const burst = this.commandBurst.get(sender) || { count: 0, last: Date.now() };
+      const now = Date.now();
+
+      if (now - burst.last < 2000) {
+        burst.count++;
+      } else {
+        burst.count = 0;
+      }
+      burst.last = now;
+      this.commandBurst.set(sender, burst);
+
+      if (burst.count > 3) {
+        log.warn(`🚫 BURST PROTECTION: Ignoring spam from ${sender}`);
+        return;
+      }
+    }
+
+
+    // --- HONEYPOT TRAP DETECTION ---
+    if (this.activeTraps && this.activeTraps.has(CONFIG.prefix + cmdName)) {
+      log.warn(`🍯 HONEYPOT: Bot trap triggered by ${sender} in ${chatId}`);
+      await this.neutralizeThreat(chatId, sender, message, "Automated Bot Probe (Honeypot Trap)");
+      return;
+    }
+
     const plugin = this.commands.get(cmdName);
     if (plugin) {
       try {
@@ -1230,15 +1362,9 @@ class PsychoBot extends EventEmitter {
         return;
       }
     }
-
-
-    // If command wasn't found in plugins, it might be for the AI or an unknown command
   }
 
-
-
-
-
+  // If command wasn't found in plugins, it might be for the AI or an unknown command
 
 
 
@@ -1370,11 +1496,51 @@ class PsychoBot extends EventEmitter {
   }
 
   async checkAutoMod(chatId, sender, text, message) {
-    if (!text) return true;
+    if (!text && !message.message?.contactMessage && !message.message?.contactsArrayMessage) return true;
 
-    // 1. Scam Links detection
-    const scamPatterns = [/wa\.me\/settings/i, /free-robux/i, /bit\.ly/i, /gift-card/i];
-    if (scamPatterns.some(p => p.test(text))) {
+    const isOwner = this.isOwner(sender);
+    const isGroupAdmin = await this.isGroupAdmin(chatId, sender);
+    if (isOwner || isGroupAdmin) return true;
+
+    // --- SHIELD: ANTI-CRASH & EXPLOIT ENGINE ---
+
+    // 1. Binarios / Crash Strings Detection
+    // Detection of repetitive non-latin/symbol sequences often used in "travas"
+    const binaryPattern = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]{100,}/;
+    const extremeRepetition = /(.)\1{500,}/; // Same character repeated 500+ times
+
+    if (text && (binaryPattern.test(text) || extremeRepetition.test(text) || text.length > 15000)) {
+      log.warn(`🛡️ SHIELD: Crash code detected from ${sender} in ${chatId}`);
+      await this.neutralizeThreat(chatId, sender, message, "Crash Code / Binario");
+      return false;
+    }
+
+    // 2. Malicious Links / Freeze Links
+    const freezeLinks = [
+      /wa\.me\/settings/i,
+      /wa\.me\/qr/i,
+      /chat\.whatsapp\.com\/invite\/[a-zA-Z0-0]{50,}/, // Malformed long invite
+    ];
+
+    if (text && freezeLinks.some(p => p.test(text))) {
+      log.warn(`🛡️ SHIELD: Freeze link detected from ${sender} in ${chatId}`);
+      await this.neutralizeThreat(chatId, sender, message, "Freeze Link Exploit");
+      return false;
+    }
+
+    // 3. VCard / Contact Spam (Crash method)
+    if (message.message?.contactMessage || message.message?.contactsArrayMessage) {
+      const vcard = message.message?.contactMessage?.vcard || "";
+      if (vcard.length > 5000 || (message.message?.contactsArrayMessage?.contacts?.length > 10)) {
+        log.warn(`🛡️ SHIELD: VCard Spam detected from ${sender} in ${chatId}`);
+        await this.neutralizeThreat(chatId, sender, message, "VCard/Contact Crash Exploit");
+        return false;
+      }
+    }
+
+    // 4. Standard Scam detection (Original logic)
+    const scamPatterns = [/free-robux/i, /gift-card/i, /crypto-giveaway/i];
+    if (text && scamPatterns.some(p => p.test(text))) {
       try {
         await this.sock.sendMessage(chatId, { delete: message.key });
         await this.addWarning(chatId, sender, "Lien suspect/Scam détecté");
@@ -1383,15 +1549,44 @@ class PsychoBot extends EventEmitter {
       } catch (e) { log.debug('Failed to delete scam message:', e.message); }
     }
 
-    // 2. Dangerous characters (Hidden characters spam)
-    if (text.length > 5000) {
-      await this.sock.sendMessage(chatId, { delete: message.key });
-      await this.addWarning(chatId, sender, "Message trop long (Spam/Crash)");
-      return false;
+    // 5. Anti-Bot / Unauthorized Automated Entity Detection
+    const botPrefixes = ['.', '!', '/', '#'];
+    if (text && botPrefixes.some(p => text.startsWith(p)) && !text.startsWith(CONFIG.prefix)) {
+      log.warn(`🤖 ANTI-BOT: Potential bot detected from ${sender} (Prefix match)`);
     }
 
     return true;
+
   }
+
+  /**
+   * Neutralizes a threat by deleting the message and kicking the user
+   */
+  async neutralizeThreat(chatId, sender, message, reason) {
+    try {
+      // 1. Delete immediately
+      await this.sock.sendMessage(chatId, { delete: message.key });
+
+      // 2. Notify
+      const userTag = `@${sender.split('@')[0]}`;
+      await this.sendMessage(chatId, {
+        text: `🛡️ *SHIELD PROTOCOL ACTIVATED* 🛡️\n\n⚠️ *Menace détectée:* ${reason}\n👤 *Source:* ${userTag}\n\n*Action:* Suppression immédiate et bannissement du périmètre. \n\n_Sécurité AbyssFlow assurée._ ⚔️`,
+        mentions: [sender]
+      });
+
+      // 3. Kick
+      const isBotAdmin = await this.isBotGroupAdmin(chatId);
+      if (isBotAdmin) {
+        await this.sock.groupParticipantsUpdate(chatId, [sender], "remove");
+        log.info(`🛡️ SHIELD: User ${sender} kicked from ${chatId} for ${reason}`);
+      } else {
+        log.warn(`🛡️ SHIELD: Failed to kick ${sender} in ${chatId} - Bot is not admin`);
+      }
+    } catch (error) {
+      log.error('Shield neutralization error:', error.message);
+    }
+  }
+
 
   async addWarning(groupId, userId, reason) {
     try {
@@ -1647,7 +1842,30 @@ class PsychoBot extends EventEmitter {
       }
     }, { timezone: "Africa/Douala" });
   }
+
+  /**
+   * GHOST-CORE: Human Activity Simulator (Phase 9)
+   * Periodically performs background actions to look like a real user.
+   */
+  async startGhostCore() {
+    log.info('👻 GHOST-CORE: Anti-Ban activity active');
+    setInterval(async () => {
+      try {
+        if (!this.sock || this.cloakMode) return;
+
+        // 1. Simulate "Online" status
+        await this.sock.sendPresenceUpdate('available');
+        await delay(Math.floor(Math.random() * 4000) + 1000);
+        await this.sock.sendPresenceUpdate('unavailable');
+
+        log.debug('👻 GHOST-CORE: Performed human activity pulse.');
+      } catch (e) {
+        log.warn('GHOST-CORE pulse inhibited:', e.message);
+      }
+    }, (Math.floor(Math.random() * 10) + 5) * 60 * 1000); // Every 5-15 minutes
+  }
 }
+
 
 
 module.exports = PsychoBot;

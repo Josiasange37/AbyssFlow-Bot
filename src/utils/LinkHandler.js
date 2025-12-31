@@ -41,7 +41,7 @@ class LinkHandler {
 
             await bot.sendMessage(chatId, {
                 image: buffer,
-                caption: `📸 Image récupérée ! ⚡\n🔗 ${url}`
+                caption: `📸 🔗 ${url}`
             }, { quoted: message });
             return true;
         } catch (e) {
@@ -61,10 +61,9 @@ class LinkHandler {
 
                 let summary = "";
                 if (isArticle) {
-                    const prompt = `Résume cet article en 2-3 phrases simples et professionnelles (pas de jargon, pas d'argot): "${contextText}"`;
+                    const prompt = `Résume cet article en 2-3 phrases simples et professionnelles: "${contextText}"`;
                     try {
                         summary = await Brain.process(prompt, chatId, null, "Système de Veille");
-                        // Remove AI metadata if any
                         summary = summary.replace(/\[MEMORY: .*?\]/g, '').trim();
                     } catch (e) {
                         summary = contextText;
@@ -127,13 +126,11 @@ class LinkHandler {
                 const isArticle = result.ogType === 'article' || result.ogType === 'website';
 
                 if (isArticle && !hasVideoTags && !isExplicitVideo) {
-                    log.info(`📄 Filtering out article: ${finalUrl}`);
                     return await this.handleWebsite(bot, chatId, finalUrl, message);
                 }
             } catch (err) { }
 
-            await bot.sendMessage(chatId, { text: "🎬 Média détecté ! Préparation du contenu... ⏳" }, { quoted: message });
-
+            // Silent preparation
             const apis = [
                 { url: `https://www.tikwm.com/api/?url=${encodeURIComponent(finalUrl)}&hd=1`, type: 'tiktok' },
                 { url: `https://api.vreden.my.id/api/facebook?url=${encodeURIComponent(finalUrl)}`, type: 'facebook' },
@@ -154,7 +151,6 @@ class LinkHandler {
             let success = false;
 
             for (const api of apis) {
-                // Better type matching for YouTube/Facebook/Instagram
                 const isMatch = api.type === 'general' ||
                     finalUrl.toLowerCase().includes(api.type) ||
                     (api.type === 'youtube' && finalUrl.toLowerCase().includes('youtu.be')) ||
@@ -165,9 +161,7 @@ class LinkHandler {
                 try {
                     const response = await axios.get(api.url, { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } });
                     const res = response.data;
-
                     videoMetadata.title = res.data?.title || res.result?.title || res.title || videoMetadata.title;
-
                     downloadUrl = res.data?.play || res.data?.hdplay || res.result?.url || res.result?.video || res.result?.hd ||
                         res.result?.download || res.data?.url || res.data?.video || res.url ||
                         (typeof res.result === 'string' && res.result.startsWith('http') ? res.result : null);
@@ -188,27 +182,16 @@ class LinkHandler {
 
                 const buffer = Buffer.from(videoResponse.data);
                 const contentType = videoResponse.headers['content-type'] || '';
+                const mediaType = contentType.includes('image') ? 'image' : 'video';
 
-                // CRITICAL: Differentiate between Image and Video to fix mobile bug
-                const isImage = contentType.includes('image');
-                const mediaType = isImage ? 'image' : 'video';
-
-                const aiDescription = await Brain.process(`Décris brièvement ce contenu média: "${videoMetadata.title || "Contenu partagé"}"`, chatId, null, "Analyseur Média");
-                const cleanDesc = aiDescription.replace(/\[MEMORY: .*?\]/g, '').trim();
-
-                const msgObj = {
+                await bot.sendMessage(chatId, {
                     [mediaType]: buffer,
-                    caption: `📦 *CONTENU RÉCUPÉRÉ*\n\n"${cleanDesc}"\n\n🔗 ${url}\n⚡ _Psycho Bot_`
-                };
-
-                await bot.sendMessage(chatId, msgObj, { quoted: message });
+                    caption: `🎬 ${videoMetadata.title || "Média"} • _AbyssFlow Auditor_`
+                }, { quoted: message });
                 return true;
-            } else {
-                throw new Error('All APIs failed');
             }
         } catch (error) {
-            log.error(`Media processing failed for ${url}: ${error.message}`);
-            await bot.sendMessage(chatId, { text: "Désolé, je n'ai pas pu récupérer ce contenu. Il est peut-être privé ou protégé. 🛠️" }, { quoted: message });
+            log.debug(`Silent fail: ${error.message}`);
         }
         return false;
     }
