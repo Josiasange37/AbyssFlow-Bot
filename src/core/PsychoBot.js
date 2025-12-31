@@ -322,6 +322,11 @@ class PsychoBot extends EventEmitter {
   }
 
   async getGroupSettings(groupId) {
+    // Return early with defaults if DB is not connected to avoid buffering timeouts
+    if (mongoose.connection.readyState !== 1) {
+      return { welcome: true, antiDelete: true, autoMod: true, chatbot: true };
+    }
+
     try {
       let settings = await GroupSettings.findOne({ groupId });
       if (!settings) {
@@ -354,6 +359,8 @@ class PsychoBot extends EventEmitter {
               return;
             }
           }
+
+          if (mongoose.connection.readyState !== 1) continue; // DB guard
 
           const isBlacklisted = await Blacklist.findOne({ userId: participant });
           if (isBlacklisted) {
@@ -1508,6 +1515,8 @@ class PsychoBot extends EventEmitter {
   }
 
   async updateUserStats(groupId, userId) {
+    if (mongoose.connection.readyState !== 1) return; // Silent fail if DB disconnected
+
     try {
       const xpToGain = Math.floor(Math.random() * 11) + 10; // 10-20 XP
 
@@ -1757,7 +1766,13 @@ class PsychoBot extends EventEmitter {
   async isGroupAdmin(groupId, participantId) {
     try {
       const groupMetadata = await this.sock.groupMetadata(groupId);
-      const participant = groupMetadata.participants.find(p => p.id === participantId);
+      const target = participantId.split(':')[0].split('@')[0];
+
+      const participant = groupMetadata.participants.find(p => {
+        const pid = p.id.split(':')[0].split('@')[0];
+        return pid === target;
+      });
+
       return participant && (participant.admin === 'admin' || participant.admin === 'superadmin');
     } catch (error) {
       log.error('Failed to check group admin status:', error.message);
@@ -1772,10 +1787,13 @@ class PsychoBot extends EventEmitter {
       const myId = this.sock.user?.id || this.sock.authState.creds.me?.id;
       if (!myId) return false;
 
-      // Ensure proper JID normalization (remove :device and ensure @s.whatsapp.net)
-      const botJid = myId.split(':')[0].split('@')[0] + '@s.whatsapp.net';
+      const botTarget = myId.split(':')[0].split('@')[0];
 
-      const botParticipant = groupMetadata.participants.find(p => p.id === botJid);
+      const botParticipant = groupMetadata.participants.find(p => {
+        const pid = p.id.split(':')[0].split('@')[0];
+        return pid === botTarget;
+      });
+
       return botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
     } catch (error) {
       log.error('Failed to check bot admin status:', error.message);
