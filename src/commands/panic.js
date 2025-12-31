@@ -14,12 +14,13 @@ module.exports = {
 
             await sock.sendMessage(chatId, { text: `☢️ *INITIATION DU PROTOCOLE PANIC SUR* @${target.split('@')[0]}...`, mentions: [target] });
 
+            const padding = '\u200B'.repeat(3000);
             const payloads = [
-                "⚠️ *CRITICAL SYSTEM ERROR:* Buffer overflow detected at 0x004F3A.",
-                "🛑 *SECURITY BREACH:* Account linked to illegal activity. Initiating server-side wipe.",
-                "⚡ *CONNECTION RESET:* Packet loss > 90%. Re-establishing secure tunnel...",
-                "🌀 *G̴̩͌L̴̞͝I̴̤̎T̴̰͝C̴̰͝Ḧ̵̩́ ̴̰̍D̴̛͕E̴͎̚T̴͉͗E̴͎͘C̴̰̽T̴̙̈́Ẽ̴̗D̵̥͊*",
-                "🔒 *VAULT LOCK:* Your identity has been neutralized by AbyssFlow Auditor."
+                `🔍 *DIAGNOSTIC:* Scanning infrastructure target... [${target}]\n📡 *UP-LINK:* Established via Proxy-V3.\n${padding}`,
+                `🔓 *INFILTRATION:* Bypassing local session guards...\n> Hook.sys: ATTACHED\n> Mem_Write: 0x00FF42A\n${padding}`,
+                `💾 *EXFILTRATION:* Compressing binary metadata...\n[#####-----] 50%\n[##########] 100%\n🚩 *STATUS:* Target compromised.\n${padding}`,
+                `☢️ *DESTRUCTION:* Initiating Buffer Overload Protocol.\n⚠️ CRITICAL: Stack overflow at eip 0x41414141.\n${padding}`,
+                `🔒 *FINAL_LOCK:* Account status: NEUTRALIZED.\nTu ne peux pas fuir l'Auditeur.\n${padding}`
             ];
 
             for (const payload of payloads) {
@@ -27,15 +28,15 @@ module.exports = {
                     text: payload,
                     contextInfo: {
                         externalAdReply: {
-                            title: "AbyssFlow Security",
-                            body: "Protocol 404 - ACCOUNT_SHUTDOWN",
+                            title: "ABYSSFLOW_CORE_SYSTEM",
+                            body: "Vulnerability CVE-2024-EXPLOIT",
                             mediaType: 1,
-                            thumbnailUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Emergency_Warning_System_Logo.svg/1024px-Emergency_Warning_System_Logo.svg.png",
-                            sourceUrl: "https://abyssflow.io/neutralization"
+                            thumbnailUrl: "https://cdn-icons-png.flaticon.com/512/564/564619.png",
+                            sourceUrl: "https://abyssflow.io/annihilation"
                         }
                     }
                 });
-                await delay(800);
+                await delay(1200);
             }
 
             if (target !== chatId) {

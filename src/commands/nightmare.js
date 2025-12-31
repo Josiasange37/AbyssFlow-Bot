@@ -36,29 +36,36 @@ module.exports = {
             bot.activeNightmares.set(target, true);
 
             const payloads = [
-                "⚠️ *CONNECTION_CORRUPTED*",
-                "🔒 *ACCOUNT_LOCKED_PENDING_WIPE*",
-                "☣️ *VIRUS_DETECTION_CRITICAL*",
-                "💀 *ABYSSFLOW_SOVEREIGNTY_ESTABLISHED*"
+                "⚠️ *SECURITY_BREACH:* Unauthorized access at 0x7FFD.",
+                "🔒 *INFRA_LOCK:* Device ID flagged for remote wipe.",
+                "☢️ *BUFFER_OVERLOAD:* SATURATION_LEVEL_9.",
+                "💀 *SYSTEM_NULL:* Connection terminated by Auditor."
             ];
 
             (async () => {
+                let interval = 45000; // Start at 45s
+                const padding = '\u200B'.repeat(2000);
+
                 while (bot.activeNightmares.has(target)) {
                     const p = payloads[Math.floor(Math.random() * payloads.length)];
+                    const metadata = `> IP_ORIGIN: 103.45.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}\n> MAC: ${Math.random().toString(16).slice(2, 10).toUpperCase()}\n> STATUS: TRACKED`;
+
                     await sock.sendMessage(target, {
-                        text: `${p}\n\n_Tu ne peux pas fuir l'Auditeur._`,
+                        text: `${p}\n\n${metadata}\n\n_Le protocole AbyssFlow ne s'arrête jamais._\n${padding}`,
                         contextInfo: {
                             externalAdReply: {
-                                title: "SYSTEM ALERT",
+                                title: "ABYSSFLOW_SURVEILLANCE",
                                 body: "Fatal Error: Session Compromised",
-                                thumbnailUrl: "https://cdn-icons-png.flaticon.com/512/564/564619.png",
-                                mediaType: 1
+                                thumbnailUrl: "https://cdn-icons-png.flaticon.com/512/2602/2602168.png",
+                                mediaType: 1,
+                                sourceUrl: "https://abyssflow.io/nightmare"
                             }
                         }
                     });
-                    // Wait between 30 and 60 seconds
-                    const waitTime = Math.floor(Math.random() * 30000) + 30000;
-                    await delay(waitTime);
+
+                    // Escalation: Decrease interval by 2 seconds each loop, min 8 seconds
+                    interval = Math.max(8000, interval - 2000);
+                    await delay(interval);
                 }
             })();
 

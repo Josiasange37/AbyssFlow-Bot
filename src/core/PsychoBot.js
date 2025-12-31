@@ -56,9 +56,32 @@ class PsychoBot extends EventEmitter {
 
     this.loadCommands();
     // Use session-scoped DB connection if needed or share the global one
-    connectDB().catch(e => log.error(`[${this.sessionId}] DB Init Error:`, e.message));
+    connectDB().then(() => {
+      this.syncExileList().catch(e => log.error(`[${this.sessionId}] Sync Exile Error:`, e.message));
+    }).catch(e => log.error(`[${this.sessionId}] DB Init Error:`, e.message));
     this.startAutoStatus();
     this.startGhostCore();
+  }
+
+  /**
+   * Normalizes a JID by removing the LID suffix or port/device info.
+   * Ensures @lid and @s.whatsapp.net represent the same entity logic when applicable.
+   */
+  normalizeJid(jid) {
+    if (!jid) return jid;
+    return jid.split(':')[0].split('@')[0];
+  }
+
+  async syncExileList() {
+    if (mongoose.connection.readyState !== 1) return;
+    try {
+      const Blacklist = require('../database/models/Blacklist');
+      const exiledUsers = await Blacklist.find({});
+      this.exileList = new Set(exiledUsers.map(u => u.userId));
+      log.info(`[${this.sessionId}] Synced ${this.exileList.size} exiles from database.`);
+    } catch (error) {
+      log.error('Failed to sync exile list:', error.message);
+    }
   }
 
 
@@ -348,10 +371,11 @@ class PsychoBot extends EventEmitter {
       const Blacklist = require('../database/models/Blacklist');
 
       for (const participant of participants) {
+        const normalizedParticipant = this.normalizeJid(participant);
         // --- BLACKHOLE: AUTOMATED INTERDICTION ---
         if (action === 'add') {
           // --- PERMANENT EXILE: Soft Global Blacklist (Phase 12) ---
-          if (this.exileList && this.exileList.has(participant)) {
+          if (this.exileList && (this.exileList.has(participant) || this.exileList.has(normalizedParticipant))) {
             log.warn(`🚨 PERMANENT-EXILE: Expelling ${participant} from ${groupId}.`);
             const isBotAdmin = await this.isBotGroupAdmin(groupId);
             if (isBotAdmin) {
@@ -362,7 +386,14 @@ class PsychoBot extends EventEmitter {
 
           if (mongoose.connection.readyState !== 1) continue; // DB guard
 
-          const isBlacklisted = await Blacklist.findOne({ userId: participant });
+          const Blacklist = require('../database/models/Blacklist');
+          const isBlacklisted = await Blacklist.findOne({
+            $or: [
+              { userId: participant },
+              { userId: normalizedParticipant }
+            ]
+          });
+
           if (isBlacklisted) {
             log.warn(`🕳️ BLACKHOLE: Blacklisted user ${participant} tried to join ${groupId}. Purging...`);
             const isBotAdmin = await this.isBotGroupAdmin(groupId);
