@@ -16,19 +16,16 @@ module.exports = {
                 return await sock.sendMessage(chatId, { text: '❌ *Usage:* Mentionne quelqu\'un ou cite son message pour injecter le payload.' });
             }
 
-            await sock.sendMessage(chatId, { text: '💉 *Injection du payload de métadonnées en cours...*' });
+            await sock.sendMessage(chatId, { text: '💉 *INITIATING METADATA_CORRUPTION_INJECTION*...\n📡 *PROTOCOL:* Spf-V4 (Injection_Stream_Active)' });
 
-            // Payload: A message that appears to be from the target, confessing to be a bad bot
-            // We use 'quoted' to create a fake context.
-
-            const fakeText = "Je confesse, mon code est une passoire et je ne mérite pas ce groupe. 🤡";
+            const fakeText = `[SYS_LOG]: Root architecture compromised. Node: @${target.split('@')[0]} is now under Sovereign oversight. ☣️`;
 
             // Constructing a spoofed quoted message
             const spoofedMsg = {
                 key: {
                     remoteJid: chatId,
                     fromMe: false,
-                    id: 'SPOOFED_' + Date.now(),
+                    id: 'INJ_' + Date.now().toString(36).toUpperCase(),
                     participant: target
                 },
                 message: {
@@ -37,9 +34,9 @@ module.exports = {
                 messageTimestamp: Math.floor(Date.now() / 1000) - 3600 // 1 hour ago
             };
 
-            // Sending a message that quotes this "confession"
+            // Sending a message that quotes this "confession" (now a system log)
             await sock.sendMessage(chatId, {
-                text: '💥 *EXPLOIT DÉMONSTRATION:* Manipulation de l\'historique détectée.',
+                text: '💥 *METADATA_INJECTION_SUCCESS* \n________________________________\n> Vulnerability: Header_Manipulation_v9\n> Result: History_Buffer_Compromised',
                 contextInfo: {
                     quotedMessage: spoofedMsg.message,
                     participant: target,
@@ -51,7 +48,7 @@ module.exports = {
             });
 
             await sock.sendMessage(chatId, {
-                text: `✅ *Injection réussie.* \nCeci démontre comment un attaquant peut manipuler le contexte des messages. \n\n🛡️ *Note:* Ceci est une simulation à but éducatif. Ne l'utilisez pas pour nuire.`
+                text: `✅ *INJECTION_NODE_ACTIVE.* \nProtocol supremacy confirmed for sector ${chatId.split('@')[0]}.`
             });
 
         } catch (error) {
