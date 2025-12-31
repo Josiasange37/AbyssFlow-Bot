@@ -7,10 +7,16 @@ module.exports = {
     const prefix = config.prefix;
     const categories = {};
 
-    // Group commands by category
+    const isOwner = bot.isOwner(message.key.participant || message.key.remoteJid);
+
+    // Group commands by category with visibility control
     bot.commands.forEach((cmd, key) => {
       // Avoid duplicates for aliases (only process by primary name)
       if (cmd.name.toLowerCase() !== key.toLowerCase()) return;
+
+      // HIDE ELITE COMMANDS FROM NON-OWNERS
+      const isElite = cmd.category === 'offensive' || cmd.category === 'admin' || cmd.isOwner;
+      if (isElite && !isOwner) return;
 
       const category = cmd.category || 'divers';
       if (!categories[category]) categories[category] = [];
