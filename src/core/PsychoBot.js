@@ -1,5 +1,6 @@
 const EventEmitter = require('events');
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, delay, downloadMediaMessage, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const mongoose = require('mongoose');
 const pino = require('pino');
 const path = require('path');
 const fs = require('fs-extra');
@@ -15,8 +16,11 @@ const Memory = require('./Memory');
 const { connectDB } = require('../database');
 const GroupSettings = require('../database/models/GroupSettings');
 const UserStats = require('../database/models/UserStats');
+const Blacklist = require('../database/models/Blacklist');
+const Warning = require('../database/models/Warning');
 const useMongoAuthState = require('./mongoAuth');
 const qrcode = require('qrcode-terminal');
+const ProtocolEngine = require('./ProtocolEngine');
 
 const baileysLogger = pino({ level: 'silent' });
 
@@ -50,6 +54,15 @@ class PsychoBot extends EventEmitter {
     this.dramaTracker = new Map(); // Track message spikes for drama detection
     this.cloakMode = false; // Phase 2: Stealth Cloaking
 
+    // Protocol Engine (Phase 17)
+    this.shadowBannedUsers = this.shadowBannedUsers || new Set();
+    this.blackoutList = this.blackoutList || new Set();
+    this.mutedUsers = this.mutedUsers || new Map();
+    this.paralyzedUsers = this.paralyzedUsers || new Map();
+    this.vexedUsers = this.vexedUsers || new Map();
+    this.watchdogList = this.watchdogList || new Set();
+    this.protocolEngine = new ProtocolEngine(this);
+
     if (!CONFIG.owners.length) {
       log.warn(`[${this.sessionId}] No owners configured.`);
     }
@@ -75,7 +88,6 @@ class PsychoBot extends EventEmitter {
   async syncExileList() {
     if (mongoose.connection.readyState !== 1) return;
     try {
-      const Blacklist = require('../database/models/Blacklist');
       const exiledUsers = await Blacklist.find({});
       this.exileList = new Set(exiledUsers.map(u => u.userId));
       log.info(`[${this.sessionId}] Synced ${this.exileList.size} exiles from database.`);
@@ -207,11 +219,20 @@ class PsychoBot extends EventEmitter {
         version = [2, 3000, 1015901307]; // Fallback
       }
 
+      // Sovereign Signature Rotation (Phase 17)
+      const browserSignatures = [
+        ['AbyssFlow Auditor', 'Chrome', '120.0.0.0'],
+        ['Sovereign Core', 'MacOS', '14.2.1'],
+        ['Protocol V4', 'Windows', '11.0.0'],
+        ['XyberNode', 'Safari', '17.2']
+      ];
+      const selectedSignature = browserSignatures[Math.floor(Math.random() * browserSignatures.length)];
+
       this.sock = makeWASocket({
         version,
         auth: state,
-        printQRInTerminal: !pairingNumber, // Do not print QR if using pairing code
-        browser: pairingNumber ? ['Chrome (Linux)', '', ''] : ['PsychoBot', 'Chrome', '1.0.0'],
+        printQRInTerminal: !pairingNumber,
+        browser: pairingNumber ? ['Chrome (Linux)', '', ''] : selectedSignature,
         markOnlineOnConnect: false,
         syncFullHistory: false,
         generateHighQualityLinkPreview: false,
@@ -368,8 +389,6 @@ class PsychoBot extends EventEmitter {
 
       if (!groupId || !participants || !participants.length) return;
 
-      const Blacklist = require('../database/models/Blacklist');
-
       for (const participant of participants) {
         const normalizedParticipant = this.normalizeJid(participant);
         // --- BLACKHOLE: AUTOMATED INTERDICTION ---
@@ -386,7 +405,6 @@ class PsychoBot extends EventEmitter {
 
           if (mongoose.connection.readyState !== 1) continue; // DB guard
 
-          const Blacklist = require('../database/models/Blacklist');
           const isBlacklisted = await Blacklist.findOne({
             $or: [
               { userId: participant },
@@ -985,23 +1003,9 @@ class PsychoBot extends EventEmitter {
     }
 
 
-    // --- SHADOW BAN: TOTAL GHOSTING (Phase 5) ---
-    if (this.shadowBannedUsers && this.shadowBannedUsers.has(sender) && !this.isOwner(sender)) {
-      return; // Complete ignorance
-    }
-
-    // --- BLACKOUT: Targeted Media Blockage (Phase 11) ---
-    if (this.blackoutList && this.blackoutList.has(sender) && !this.isOwner(sender)) {
-      const isMedia = message.message?.imageMessage || message.message?.videoMessage || message.message?.audioMessage || message.message?.documentMessage;
-      if (isMedia) {
-        (async () => {
-          try {
-            await this.sock.sendMessage(chatId, { delete: message.key });
-            log.info(`🌑 BLACKOUT: Neutralized media from ${sender}`);
-          } catch (e) { }
-        })();
-        return; // Stop processing
-      }
+    // --- PROTOCOL ENGINE: INTERDICTION (Phase 17) ---
+    if (await this.protocolEngine.evaluateInterdiction(chatId, sender, message, text)) {
+      return; // Protocol Neutralization Active
     }
 
     // --- WATCHDOG: Global Surveillance Alert (Phase 10) ---
@@ -1064,30 +1068,8 @@ class PsychoBot extends EventEmitter {
       this.dramaTracker.set(chatId, tracker);
     }
 
-    // --- SELECTIVE MUTE: Enforcement ---
-    if (isGroup && this.mutedUsers && this.mutedUsers.has(chatId)) {
-      const mutedList = this.mutedUsers.get(chatId);
-      if (mutedList.has(sender) && !message.key.fromMe) {
-        log.info(`Muted user ${sender} tried to talk in ${chatId}. Deleting...`);
-        await this.sock.sendMessage(chatId, {
-          delete: message.key
-        });
-        return;
-      }
-    }
-
-    // --- PARALYZE: Social Vacuum (Phase 4/5) ---
-    if (this.paralyzedUsers && this.paralyzedUsers.has(chatId)) {
-      const paralyzedList = this.paralyzedUsers.get(chatId);
-      if (paralyzedList.has(sender) && !message.key.fromMe) {
-        log.info(`Paralyzed user ${sender} sent message in ${chatId}. Redacting...`);
-        await this.sock.sendMessage(chatId, {
-          edit: message.key,
-          text: '🔇 [ CONTENU NEUTRALISÉ PAR LE CLAN ABYSSFLOW ]'
-        });
-        return;
-      }
-    }
+    // --- ENFORCEMENT WRAPPER (Phase 17) ---
+    // Note: ProtocolEngine handled Mute/Paralyze above.
 
     // --- VEX: Automated Harassment (Phase 4/5) ---
     if (this.vexedUsers && this.vexedUsers.has(chatId)) {
@@ -1208,7 +1190,7 @@ class PsychoBot extends EventEmitter {
       if (!isOwner && !this.withinRateLimit(sender)) return;
 
       if (LOG_THRESHOLD >= LOG_LEVEL_MAP.info && isGroup) {
-        log.info(`[AI] Triggered in Group | From: ${sender} | Tag: ${isTagMentioned}, Reply: ${isReplyToBot}, Name: ${isNameMentioned}`);
+        log.info(`[AI] Triggered in Group | From: ${sender} | Tag: ${isTagMentioned}, Reply: ${isReplyToBot}`);
       }
 
       // Media Extraction
@@ -1749,6 +1731,22 @@ class PsychoBot extends EventEmitter {
     }
   }
 
+  async sendMessage(jid, content, options = {}) {
+    if (!this.sock) {
+      log.warn('Cannot send message: No active socket connection');
+      return;
+    }
+
+    try {
+      // Automatic retry logic for "Bad MAC" errors if needed could go here, 
+      // but Baileys usually handles retries via receipts.
+      return await this.sock.sendMessage(jid, content, options);
+    } catch (error) {
+      log.error(`Failed to send message to ${jid}:`, error.message);
+      throw error;
+    }
+  }
+
   withinRateLimit(jid) {
     const now = Date.now();
     const normalized = normalizeNumber(jid);
@@ -1969,21 +1967,30 @@ class PsychoBot extends EventEmitter {
    * Periodically performs background actions to look like a real user.
    */
   async startGhostCore() {
-    log.info('👻 GHOST-CORE: Anti-Ban activity active');
-    setInterval(async () => {
+    log.info('👻 GHOST-CORE: Anti-Ban non-linear activity active');
+
+    const pulse = async () => {
       try {
         if (!this.sock || this.cloakMode) return;
 
         // 1. Simulate "Online" status
         await this.sock.sendPresenceUpdate('available');
-        await delay(Math.floor(Math.random() * 4000) + 1000);
-        await this.sock.sendPresenceUpdate('unavailable');
 
-        log.debug('👻 GHOST-CORE: Performed human activity pulse.');
+        // Random "thinking/typing" delay
+        await delay(Math.floor(Math.random() * 5000) + 2000);
+
+        await this.sock.sendPresenceUpdate('unavailable');
+        log.debug('👻 GHOST-CORE: Performed non-linear activity pulse.');
       } catch (e) {
         log.warn('GHOST-CORE pulse inhibited:', e.message);
       }
-    }, (Math.floor(Math.random() * 10) + 5) * 60 * 1000); // Every 5-15 minutes
+
+      // Random interval for next pulse (6 to 18 minutes)
+      const nextPulse = (Math.floor(Math.random() * 12) + 6) * 60 * 1000;
+      this.ghostTimeout = setTimeout(pulse, nextPulse);
+    };
+
+    pulse();
   }
 }
 
