@@ -24,14 +24,14 @@ module.exports = {
                 return await sock.sendMessage(chatId, { text: '❌ *Usage:* \n`*hijack @user | Message` \nOu réponds à quelqu\'un avec `*hijack | Message`.' });
             }
 
-            await sock.sendMessage(chatId, { text: '🎭 *Synchronisation de l\'identité simulée...*' });
+            await sock.sendMessage(chatId, { text: '🎭 *INITIATING SOVEREIGN_IDENTITY_ACQUISITION*...\n📡 *PROTOCOL:* Spf-V4 (Spoofing_Engine_Active)' });
 
             // Payload composition
             const spoofedMsg = {
                 key: {
                     remoteJid: chatId,
                     fromMe: false,
-                    id: 'HIJACK_' + Date.now(),
+                    id: 'SPF_' + Date.now().toString(36).toUpperCase(),
                     participant: targetJid
                 },
                 message: {
@@ -40,14 +40,14 @@ module.exports = {
             };
 
             await sock.sendMessage(chatId, {
-                text: `💀 *IDENTITY HIJACK SUCCESS* \n\nInterception du flux de @${targetJid.split('@')[0]} terminée.`,
+                text: `💀 *IDENTITY HIJACK COMPLETED* \n________________________________\n> Target: @${targetJid.split('@')[0]}\n> Method: Flux_Interception_v4\n> Status: Sovereign_Control_Established`,
                 contextInfo: {
                     quotedMessage: spoofedMsg.message,
                     participant: targetJid,
                     remoteJid: chatId,
                     // Additional "Attack" attributes
                     isForwarded: true,
-                    forwardingScore: 2
+                    forwardingScore: 5 // Higher score for dominance feel
                 },
                 mentions: [targetJid]
             });

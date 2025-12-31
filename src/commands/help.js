@@ -28,26 +28,30 @@ module.exports = {
     });
 
     const helpText = [
-      `yo ! moi c'est *psycho bot* 🤖`,
-      `v'là ce que je peux faire :`,
-      ''
+      `🔳 *ABYSSFLOW_AUDITOR_V3.1: SOVEREIGN_DOMINANCE*`,
+      `📡 *IDENTIFIED_SUBJECT:* @${message.key.participant ? message.key.participant.split('@')[0] : message.key.remoteJid.split('@')[0]}`,
+      `📦 *ENVIRONMENT:* AbyssFlow Protocol v4_Spf`,
+      '',
+      'AVAILABLE_PROTOCOLS:',
+      '________________________________'
     ];
 
     // Sort categories for consistency
     const sortedCategories = Object.keys(categories).sort();
 
     for (const cat of sortedCategories) {
-      helpText.push(`*${cat.toUpperCase()}*`);
+      helpText.push(`\n*${cat.toUpperCase()}_SECTION*`);
       categories[cat].forEach(cmd => {
-        helpText.push(`${prefix}${cmd.name} - ${cmd.description}`);
+        helpText.push(`> ${prefix}${cmd.name.toUpperCase()} - ${cmd.description}`);
       });
-      helpText.push('');
     }
 
-    helpText.push(`💬 *discuter avec moi*`);
-    helpText.push(`tag moi ou répond à un de mes messages pour papoter !`);
     helpText.push('');
-    helpText.push(`hésite pas si t'as besoin d'aide 🤝`);
+    helpText.push('________________________________');
+    helpText.push(`🤖 *NEURAL_INTERFACE_STATUS:* ACTIVE`);
+    helpText.push(`> Direct Tagging or Reply triggers AI intervention.`);
+    helpText.push('');
+    helpText.push(`⚠️ *SECURITY_NOTICE:* Unauthorized access to elite protocols is prohibited.`);
 
     await bot.sendMessage(chatId, {
       text: helpText.join('\n'),

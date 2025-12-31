@@ -1114,10 +1114,12 @@ class PsychoBot extends EventEmitter {
     const mentionedJids = contextInfo?.mentionedJid || [];
     const normalizedText = (text || '').toLowerCase();
 
-    // Trigger Logic: Broad Match to fix "Empty Mention List" bugs
-    // Checks: 1. Is JID in mention list? 2. Is Number in text (@237...)? 3. Is raw ID (without domain) in text?
-    const isTagMentioned = mentionedJids.some(jid => normalizeNumber(jid) === myNumber) ||
-      (text && (text.includes(`@${myNumber}`) || text.includes(`@${myJid.split('@')[0]}`)));
+    // Trigger Logic: Strict Matching to prevent false positives
+    // Checks: 1. Is JID in mention list? 2. Is raw ID (without domain) in text (@ID)?
+    const isTagMentioned = mentionedJids.some(jid => {
+      const normalizedJid = jid.split('@')[0].split(':')[0];
+      return normalizedJid === myNumber;
+    }) || (text && text.includes(`@${myNumber}`));
 
     // Enhanced Reply Check
     let isReplyToBot = false;
@@ -1127,13 +1129,11 @@ class PsychoBot extends EventEmitter {
     }
 
 
-    // Strict requirement: "bot" or "psycho" (to avoid false positives with owner name)
-    const isNameMentioned = normalizedText.includes('bot') ||
-      normalizedText.includes('psycho');
-
     const isDM = !isGroup;
 
-    const isBotTriggered = isTagMentioned || isReplyToBot || isDM || (isGroup && isNameMentioned);
+    // Sovereign Rule: AI only responds to Direct Interaction (Tag/Reply/DM)
+    // Removed isNameMentioned check to avoid "script kiddie" pings in middle of conversation.
+    const isBotTriggered = isTagMentioned || isReplyToBot || isDM;
 
     // --- DM SHIELD: QUARANTINE PROTOCOL (Phase 5) ---
     if (isDM && this.dmShield && !isOwner && !message.key.fromMe) {
@@ -1150,9 +1150,17 @@ class PsychoBot extends EventEmitter {
     const urlPattern = /https?:\/\/[^\s]+/;
     if (text && urlPattern.test(text) && !message.key.fromMe) {
       const linkStart = Date.now();
-      const handled = await LinkHandler.handle(this, chatId, text, message);
+      // Add a 5s timeout to link handling to prevent hanging the main loop
+      try {
+        const handled = await Promise.race([
+          LinkHandler.handle(this, chatId, text, message),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('LinkHandler Timeout')), 6000))
+        ]);
+        if (handled) return;
+      } catch (e) {
+        log.debug(`LinkHandler error or timeout: ${e.message}`);
+      }
       log.info(`🔗 Link handling took ${Date.now() - linkStart}ms`);
-      if (handled) return;
     }
 
     const isGroupAdmin = isGroup ? await this.isGroupAdmin(chatId, sender) : false;
@@ -1758,45 +1766,31 @@ class PsychoBot extends EventEmitter {
   }
 
   isOwner(jid) {
-    if (!CONFIG.owners.length) {
-      log.warn('No owners configured in BOT_OWNERS');
-      return false;
-    }
+    if (!CONFIG.owners.length) return false;
 
-    const normalized = normalizeNumber(jid);
+    // Normalize JIDs for comparison (support both @s.whatsapp.net and @lid)
+    const normalizedSender = (jid || '').split('@')[0].split(':')[0];
 
-    // Log the original JID for debugging
-    if (LOG_THRESHOLD >= LOG_LEVEL_MAP.info) {
-      log.info(`Checking owner for JID: ${jid} -> Normalized: ${normalized}`);
-    }
-
-    const isOwnerResult = CONFIG.owners.some((owner) => {
-      const ownerNorm = normalizeNumber(owner);
-      // Check if numbers match (flexible matching)
-      const match = normalized.includes(ownerNorm) || ownerNorm.includes(normalized) ||
-        normalized.endsWith(ownerNorm) || ownerNorm.endsWith(normalized);
-
-      if (LOG_THRESHOLD >= LOG_LEVEL_MAP.info) {
-        log.info(`  Comparing: ${normalized} vs ${ownerNorm} -> ${match ? 'MATCH ✓' : 'NO MATCH ✗'}`);
-      }
-
-      if (match) {
-        log.info(`✅ Owner detected: ${normalized} matches ${ownerNorm}`);
-      }
-
-      return match;
+    return CONFIG.owners.some(owner => {
+      const normalizedOwner = owner.split('@')[0].split(':')[0];
+      return normalizedSender === normalizedOwner;
     });
-
-    if (!isOwnerResult && LOG_THRESHOLD >= LOG_LEVEL_MAP.info) {
-      log.info(`❌ ${jid} is NOT an owner`);
-    }
-
-    return isOwnerResult;
   }
 
   async isGroupAdmin(groupId, participantId) {
     try {
-      const groupMetadata = await this.sock.groupMetadata(groupId);
+      if (!groupId.endsWith('@g.us')) return false;
+
+      // Use cache if metadata is less than 2 minutes old
+      const cache = this.metadataCache.get(groupId);
+      let groupMetadata;
+      if (cache && (Date.now() - cache.time < 120_000)) {
+        groupMetadata = cache.data;
+      } else {
+        groupMetadata = await this.sock.groupMetadata(groupId);
+        this.metadataCache.set(groupId, { data: groupMetadata, time: Date.now() });
+      }
+
       const target = participantId.split(':')[0].split('@')[0];
 
       const participant = groupMetadata.participants.find(p => {
@@ -1814,7 +1808,16 @@ class PsychoBot extends EventEmitter {
   async isBotGroupAdmin(groupId) {
     try {
       if (!groupId.endsWith('@g.us')) return false;
-      const groupMetadata = await this.sock.groupMetadata(groupId);
+
+      const cache = this.metadataCache.get(groupId);
+      let groupMetadata;
+      if (cache && (Date.now() - cache.time < 120_000)) {
+        groupMetadata = cache.data;
+      } else {
+        groupMetadata = await this.sock.groupMetadata(groupId);
+        this.metadataCache.set(groupId, { data: groupMetadata, time: Date.now() });
+      }
+
       const myId = this.sock.user?.id || this.sock.authState.creds.me?.id;
       if (!myId) return false;
 
