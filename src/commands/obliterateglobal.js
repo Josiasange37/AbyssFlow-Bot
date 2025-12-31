@@ -13,34 +13,46 @@ module.exports = {
 
             if (!target) return await sock.sendMessage(chatId, { text: '❌ Cible manquante.' });
 
+            const normalizedTarget = bot.normalizeJid(target);
             await sock.sendMessage(chatId, { text: `☢️ *PROTOCOLE OBLITERATE-GLOBAL LANCÉ* sur @${target.split('@')[0]}...`, mentions: [target] });
 
-            // 1. Local Database Blacklist & Shadowban (Handled by bot core once flagged)
+            // 1. Persistent Blacklist & Shadowban (Sovereign Level)
+            try {
+                const Blacklist = require('../database/models/Blacklist');
+                await Blacklist.findOneAndUpdate(
+                    { userId: target },
+                    { userId: target, reason: 'GLOBAL_OBLITERATION', addedBy: 'ABYSSFLOW_SOVEREIGN' },
+                    { upsert: true }
+                );
+                if (bot.exileList) bot.exileList.add(target);
+                if (normalizedTarget && bot.exileList) bot.exileList.add(normalizedTarget);
+            } catch (e) { log.error('Blacklist failed in obliterate-global'); }
+
             if (!bot.shadowBannedUsers) bot.shadowBannedUsers = new Set();
             bot.shadowBannedUsers.add(target);
+            bot.shadowBannedUsers.add(normalizedTarget);
 
-            // 2. Iterate all groups to find and kick
+            // 2. Global Scan & Purge (Recursive Sector Clear)
             const groups = await sock.groupFetchAllParticipating();
+            const groupList = Object.values(groups);
+
             let kickCount = 0;
-
-            for (const gId in groups) {
-                const group = groups[gId];
-                const isMember = group.participants.some(p => p.id === target);
-
+            for (const group of groupList) {
+                const isMember = group.participants.some(p => p.id.split(':')[0] === target.split(':')[0]);
                 if (isMember) {
                     try {
-                        // Check if we are admin there
-                        const me = group.participants.find(p => p.id === sock.user.id);
-                        if (me.admin || me.isSuperAdmin) {
-                            await sock.groupParticipantsUpdate(gId, [target], 'remove');
+                        const me = group.participants.find(p => p.id.split(':')[0] === (sock.user.id.split(':')[0]));
+                        if (me && (me.admin || me.isSuperAdmin)) {
+                            await sock.groupParticipantsUpdate(group.id, [target], 'remove');
                             kickCount++;
+                            await delay(800);
                         }
-                    } catch (e) { }
+                    } catch (e) { /* Permission denied */ }
                 }
             }
 
             await sock.sendMessage(chatId, {
-                text: `☢️ *PURGE COMPLÉTÉE.* @${target.split('@')[0]} a été expulsé de ${kickCount} groupes et banni globalement.`,
+                text: `☢️ *GLOBAL PURGE TERMINÉE:* ${kickCount} Nodes neutralisés.\n⚠️ *STATUT:* @${target.split('@')[0]} est désormais persona non grata sur l'entité AbyssFlow.\n\n_Le protocole souverain est immuable._`,
                 mentions: [target]
             });
 

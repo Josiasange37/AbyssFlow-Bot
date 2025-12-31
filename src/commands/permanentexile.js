@@ -21,18 +21,35 @@ module.exports = {
 
             if (!target) return await sock.sendMessage(chatId, { text: '❌ Cible manquante.' });
 
-            if (bot.exileList.has(target)) {
+            const Blacklist = require('../database/models/Blacklist');
+            const normalizedTarget = target.split(':')[0].split('@')[0];
+
+            if (bot.exileList.has(target) || bot.exileList.has(normalizedTarget)) {
                 bot.exileList.delete(target);
+                bot.exileList.delete(normalizedTarget);
+                await Blacklist.deleteOne({ $or: [{ userId: target }, { userId: normalizedTarget }] });
+
                 await sock.sendMessage(chatId, { text: `🛡️ *EXILE RÉVOQUÉ:* @${target.split('@')[0]} est autorisé à respirer à nouveau.`, mentions: [target] });
             } else {
+                const reason = args.slice(1).join(' ') || 'Violations massives du protocole AbyssFlow.';
                 bot.exileList.add(target);
+
+                await Blacklist.findOneAndUpdate(
+                    { userId: target },
+                    { userId: target, reason: reason, addedBy: message.key.participant || message.key.remoteJid },
+                    { upsert: true }
+                );
+
                 await sock.sendMessage(chatId, {
-                    text: `⛓️ *EXILE PERMANENT ACTIVÉ:* @${target.split('@')[0]} est désormais banni de l'entièreté du réseau AbyssFlow.`,
+                    text: `⛓️ *EXILE PERMANENT ACTIVÉ:* @${target.split('@')[0]} est désormais banni de l'entièreté du réseau AbyssFlow.\n\n*Raison:* ${reason}`,
                     mentions: [target]
                 });
 
                 // Nuclear immediate purge across all groups
-                await bot.commands.get('obliterateglobal').execute({ sock, chatId, message, args, bot });
+                const obliterate = bot.commands.get('obliterateglobal');
+                if (obliterate) {
+                    await obliterate.execute({ sock, chatId, message, args: [target], bot });
+                }
             }
 
         } catch (error) {

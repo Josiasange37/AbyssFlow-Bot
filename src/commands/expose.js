@@ -22,18 +22,19 @@ ________________________________
 👤 *Sujet:* @${number}
 🆔 *CID:* ${Math.floor(Math.random() * 90000000) + 10000000}
 🌍 *Localisation:* ${country}
-🛠️ *Architecture Device:* ARMv8-A (Probable)
-🔓 *Vulnérabilités:* Buffer Overflow, Social Eng. Weakness
+🛠️ *Architecture:* ARM64 (Snapdragon 8 Gen 2)
+📡 *Network Hops:* ${Math.floor(Math.random() * 5) + 3} Nodes
+🔓 *Vulnerability:* Weak_DDR_Guard
 
-[DONNÉES EXTRAITES]
-- Prefix: +${number.substring(0, 3)}
-- Provider: Detected via JID
-- Cloud Backup: LINKED
-- Encryption Keys: INTERCEPTED (Simulated)
+[DATA_STREAM]
+> Memory_Addr: 0x${Math.random().toString(16).slice(2, 8).toUpperCase()}
+> WhatsApp_Ver: 2.24.${Math.floor(Math.random() * 20)}.${Math.floor(Math.random() * 20)}
+> Protocol_Hash: ${require('crypto').createHash('md5').update(target).digest('hex').substring(0, 16)}
+> Cloud_Backup: DETECTED
 
-🚩 *Verdict:* Cette cible est désormais vulnérable à toute interdiction de niveau 5.
+🚩 *VERDICT:* Target infrastructure mapped. Permanent interdiction recommended.
 ________________________________
-_Toutes les données ci-dessus sont des métadonnées publiques ou simulées._
+_Simulation protocol 10B active._
 `.trim();
 
             await sock.sendMessage(chatId, {
