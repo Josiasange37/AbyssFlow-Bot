@@ -10,6 +10,7 @@ const Memory = require('./Memory');
 // Modular Providers
 const GroqProvider = require('./brain/providers/GroqProvider');
 const MistralProvider = require('./brain/providers/MistralProvider');
+const PollinationsProvider = require('./brain/providers/PollinationsProvider');
 const Persona = require('./brain/Persona');
 
 /**
@@ -216,9 +217,32 @@ class PsychoBrain {
             const results = await this.searchInternet(text);
             if (results) searchContext = `\n\n[INFO LIVE WEB]:\n${results}`;
         }
+
+        // 5. Image Generation (Pollinations.ai)
+        const imageTriggers = ['imagine', 'dessine', 'génère une image', 'genere une image', 'crée une image', 'fais une image'];
+        const isImageRequest = imageTriggers.some(trigger => text.toLowerCase().startsWith(trigger) || text.toLowerCase().includes(` ${trigger} `));
+
+        if (isImageRequest && !media) {
+            // Extract prompt by removing trigger words (naive but effective)
+            let prompt = text;
+            imageTriggers.forEach(t => {
+                const regex = new RegExp(t, 'gi');
+                prompt = prompt.replace(regex, '');
+            });
+            prompt = prompt.trim();
+
+            if (prompt.length > 2) {
+                log.info(`🎨 Generating image for prompt: ${prompt}`);
+                const imageUrl = await PollinationsProvider.generateImage(prompt);
+                if (imageUrl) {
+                    return `[IMAGE] ${imageUrl}`;
+                }
+            }
+        }
+
         const finalText = text + searchContext;
 
-        // 5. Providers Loop
+        // 6. Providers Loop
         const providers = [];
 
         // Priority Logic
@@ -248,49 +272,51 @@ class PsychoBrain {
 
         if (!response) return "Oops, cerveaux HS. Réessaie dans 10 secondes. 🧠❌";
 
-        // 6. Update Memory
+        // 7. Update Memory
         if (response.includes('[MEMORY:')) {
             const memMatch = response.match(/\[MEMORY: (.*?)\]/);
             if (memMatch) Persona.setFriendFact(userName, memMatch[1]);
         }
 
-        // 7. Store Significant Interactions in Long-Term Memory
+    }
+
+        // 8. Store Significant Interactions in Long-Term Memory
         await Memory.storeLongTerm(text, response, userName);
 
-        chatHistory.push({ role: "assistant", text: response });
-        await this.saveHistory(chatId, chatHistory);
-        return response;
+chatHistory.push({ role: "assistant", text: response });
+await this.saveHistory(chatId, chatHistory);
+return response;
     }
 
     async generateStatus() {
-        // Use Groq for status
-        if (this.isProviderAvailable('groq')) {
-            const prompt = "Génère un statut WhatsApp court (1 phrase cool) pour Psycho Bot.";
-            try {
-                return await GroqProvider.process(prompt, [], "You are a creative bot.");
-            } catch (e) { }
-        }
-        return "Mode fantôme activé... 👻";
+    // Use Groq for status
+    if (this.isProviderAvailable('groq')) {
+        const prompt = "Génère un statut WhatsApp court (1 phrase cool) pour Psycho Bot.";
+        try {
+            return await GroqProvider.process(prompt, [], "You are a creative bot.");
+        } catch (e) { }
     }
+    return "Mode fantôme activé... 👻";
+}
 
     async generateVideoDescription(metadata) {
-        const prompt = `Description courte (1 phrase) pour vidéo: "${metadata.title}"`;
-        if (this.isProviderAvailable('mistral')) {
-            try { return await MistralProvider.process(prompt, [], null, "Be concise."); } catch (e) { }
-        }
-        return "Vidéo intéressante détectée. 🛠️";
+    const prompt = `Description courte (1 phrase) pour vidéo: "${metadata.title}"`;
+    if (this.isProviderAvailable('mistral')) {
+        try { return await MistralProvider.process(prompt, [], null, "Be concise."); } catch (e) { }
     }
+    return "Vidéo intéressante détectée. 🛠️";
+}
 
     // --- Legacy Providers (Keep for now) ---
     async processGitHub(text, chatHistory, media) {
-        // Implementation kept minimal/same
-        if (!this.githubClient) throw new Error('GITHUB_NOT_READY');
-        const content = [{ type: "text", text: text || "Analyze." }];
-        if (media) content.push({ type: "image_url", image_url: { url: `data:${media.mimetype};base64,${media.buffer.toString('base64')}` } });
-        const messages = [{ role: "system", content: "Act like Psycho Bot." }, ...chatHistory.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || "" })), { role: "user", content: content }];
-        const completion = await this.githubClient.chat.completions.create({ model: "gpt-4o-mini", messages: messages, max_tokens: 512 });
-        return completion.choices[0]?.message?.content || "";
-    }
+    // Implementation kept minimal/same
+    if (!this.githubClient) throw new Error('GITHUB_NOT_READY');
+    const content = [{ type: "text", text: text || "Analyze." }];
+    if (media) content.push({ type: "image_url", image_url: { url: `data:${media.mimetype};base64,${media.buffer.toString('base64')}` } });
+    const messages = [{ role: "system", content: "Act like Psycho Bot." }, ...chatHistory.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || "" })), { role: "user", content: content }];
+    const completion = await this.githubClient.chat.completions.create({ model: "gpt-4o-mini", messages: messages, max_tokens: 512 });
+    return completion.choices[0]?.message?.content || "";
+}
 }
 
 module.exports = new PsychoBrain();

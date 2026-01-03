@@ -1114,7 +1114,6 @@ class PsychoBot extends EventEmitter {
     const isDM = !isGroup;
 
     // Sovereign Assistant Rule (Passive Assistance)
-    const normalizedText = (text || '').toLowerCase();
     const isNameMentioned = text && (
       normalizedText.includes(this.botName.toLowerCase()) ||
       normalizedText.includes('psycho') ||
