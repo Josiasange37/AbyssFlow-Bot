@@ -20,7 +20,10 @@ module.exports = {
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
 
       // Download buffer to ensure delivery (fixes "video error" or broken thumbnail)
-      const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+      const response = await axios.get(imageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 60000 // 60 seconds timeout
+      });
       const buffer = Buffer.from(response.data);
 
       await bot.sendMessage(chatId, {

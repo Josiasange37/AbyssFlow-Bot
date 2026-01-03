@@ -36,17 +36,26 @@ module.exports = {
         return await bot.sendSafeMessage(chatId, `🛡️ *PROTECTION INTÉGRALE:* Impossible de retirer un membre du Clan AbyssFlow.`);
       }
 
-      // 4. Execution
-      await sock.groupParticipantsUpdate(chatId, [target], 'remove');
+      // 4. Normalize JID for Baileys (remove :0 suffix if present, ensure @s.whatsapp.net)
+      let normalizedTarget = target.split(':')[0];
+      if (!normalizedTarget.includes('@')) {
+        normalizedTarget = normalizedTarget + '@s.whatsapp.net';
+      }
+
+      log.info(`[KICK] Attempting to remove ${normalizedTarget} from ${chatId}`);
+
+      // 5. Execution
+      await sock.groupParticipantsUpdate(chatId, [normalizedTarget], 'remove');
 
       await bot.sendSafeMessage(chatId, {
-        text: `💀 *DÉCONNEXION FORCÉE:* @${target.split('@')[0]} a été expulsé du périmètre.`,
-        mentions: [target]
+        text: `💀 *DÉCONNEXION FORCÉE:* @${normalizedTarget.split('@')[0]} a été expulsé du périmètre.`,
+        mentions: [normalizedTarget]
       });
 
     } catch (error) {
       log.error('Kick command error:', error);
-      await bot.sendSafeMessage(chatId, `❌ *Echec de l'expulsion:* ${error.message}`);
+      log.error('Kick error details:', JSON.stringify(error, null, 2));
+      await bot.sendSafeMessage(chatId, `❌ *Echec de l'expulsion:* ${error.message || 'Erreur inconnue'}`);
     }
   }
 };
