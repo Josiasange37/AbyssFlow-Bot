@@ -1350,10 +1350,17 @@ class PsychoBot extends EventEmitter {
         if (finalResponse.startsWith('[IMAGE]')) {
           const imageUrl = finalResponse.replace('[IMAGE]', '').trim();
           if (!this.cloakMode) await simulateTyping(this.sock, chatId, 1000);
-          await this.sendMessage(chatId, {
-            image: { url: imageUrl },
-            caption: "✨ Voici ton image générée par Psycho Bot :"
-          }, { quoted: message });
+
+          try {
+            const { data } = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            await this.sendMessage(chatId, {
+              image: Buffer.from(data),
+              caption: "✨ Voici ton image générée par Psycho Bot :"
+            }, { quoted: message });
+          } catch (e) {
+            log.error('Failed to download/send AI image:', e.message);
+            await this.sendMessage(chatId, { text: "Oups, j'ai raté le dessin... 📉" }, { quoted: message });
+          }
           return;
         }
 
