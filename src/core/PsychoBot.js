@@ -63,6 +63,18 @@ class PsychoBot extends EventEmitter {
     this.watchdogList = this.watchdogList || new Set();
     this.protocolEngine = new ProtocolEngine(this);
 
+    // 🔥 SHADOW CONTROL - PHASE 17+ (100% FONCTIONNEL) 🔥
+    this.shadowControl = {
+      enabled: true,
+      stealthMode: false,
+      blackoutActive: new Set(),
+      shadowBanned: new Map(), // chatId -> Set<userId>
+      paralyzed: new Map(),    // chatId -> Set<userId>
+      cloakedMessages: new Set(),
+      controlLevel: 0,         // 0=normal, 1=shadow, 2=total
+      lastSweep: 0
+    };
+
     if (!CONFIG.owners.length) {
       log.warn(`[${this.sessionId}] No owners configured.`);
     }
@@ -74,6 +86,7 @@ class PsychoBot extends EventEmitter {
     }).catch(e => log.error(`[${this.sessionId}] DB Init Error:`, e.message));
     this.startAutoStatus();
     this.startGhostCore();
+    this.startShadowControl(); // 🔥 SHADOW CONTROL ACTIVÉ
   }
 
   /**
@@ -83,6 +96,121 @@ class PsychoBot extends EventEmitter {
   normalizeJid(jid) {
     if (!jid) return jid;
     return jid.split(':')[0].split('@')[0];
+  }
+
+  // 🔥 SHADOW CONTROL CORE ENGINE 🔥
+  startShadowControl() {
+    log.info(`[${this.sessionId}] 🔥 SHADOW CONTROL ACTIVATED - Phase 17+`);
+
+    // Stealth sweep every 5 minutes
+    cron.schedule('*/5 * * * *', () => this.shadowSweep());
+
+    // Auto-control level adjustment every 2 hours
+    cron.schedule('0 */2 * * *', () => this.adjustControlLevel());
+  }
+
+  shadowSweep() {
+    const now = Date.now();
+    if (now - this.shadowControl.lastSweep < 5 * 60 * 1000) return;
+
+    this.shadowControl.lastSweep = now;
+
+    // Auto-clean old shadow bans (24h TTL)
+    for (const [chatId, users] of this.shadowControl.shadowBanned.entries()) {
+      if (users instanceof Map) {
+        for (const [userId, timestamp] of users.entries()) {
+          if (now - timestamp > 24 * 60 * 60 * 1000) {
+            users.delete(userId);
+          }
+        }
+      }
+    }
+
+    log.info(`[${this.sessionId}] 🕳️ Shadow Sweep completed`);
+  }
+
+  adjustControlLevel() {
+    const activeChats = this.shadowControl.shadowBanned.size;
+    const totalThreats = Array.from(this.shadowControl.shadowBanned.values())
+      .reduce((sum, users) => sum + (users.size || 0), 0);
+
+    if (totalThreats > 50) this.shadowControl.controlLevel = 2;
+    else if (activeChats > 10) this.shadowControl.controlLevel = 1;
+    else this.shadowControl.controlLevel = 0;
+
+    log.info(`[${this.sessionId}] 🎭 Shadow Control Level: ${this.shadowControl.controlLevel}`);
+  }
+
+  // 🔥 SHADOW CONTROL - INTERDICTION TOTALE 🔥
+  async shadowInterdict(chatId, sender, message, reason = 'Shadow Control') {
+    if (!this.shadowControl.enabled) return false;
+
+    log.warn(`🕳️ SHADOW CONTROL: ${reason} -> ${sender} in ${chatId}`);
+
+    // 1. IMMEDIATE MESSAGE CLOAKING
+    try {
+      await this.sock.sendMessage(chatId, { delete: message.key });
+      this.shadowControl.cloakedMessages.add(message.key.id);
+    } catch (e) { log.debug('Failed to cloak message:', e.message); }
+
+    // 2. SHADOW BAN (Silent)
+    if (!this.shadowControl.shadowBanned.has(chatId)) {
+      this.shadowControl.shadowBanned.set(chatId, new Map());
+    }
+    this.shadowControl.shadowBanned.get(chatId).set(sender, Date.now());
+
+    // 3. LEVEL 2: TOTAL BLACKOUT
+    if (this.shadowControl.controlLevel === 2) {
+      this.shadowControl.blackoutActive.add(chatId);
+      this.sendShadowNotification(chatId, sender, reason);
+    }
+
+    // 4. PARALYSIS PROTOCOL
+    if (!this.shadowControl.paralyzed.has(chatId)) {
+      this.shadowControl.paralyzed.set(chatId, new Set());
+    }
+    this.shadowControl.paralyzed.get(chatId).add(sender);
+
+    return true;
+  }
+
+  sendShadowNotification(chatId, sender, reason) {
+    const shadowMsg = `🕳️ *SHADOW CONTROL ACTIVATED*\n\n` +
+      `👤 *Cible:* @${sender.split('@')[0]}\n` +
+      `⚠️ *Violation:* ${reason}\n\n` +
+      `_Messages interceptés et utilisateur en quarantaine silencieuse._\n\n` +
+      `🌑 *Psycho Bot Security*`;
+
+    this.sendMessage(chatId, {
+      text: shadowMsg,
+      mentions: [sender]
+    });
+  }
+
+  isShadowBanned(chatId, sender) {
+    return this.shadowControl.shadowBanned.has(chatId) &&
+      this.shadowControl.shadowBanned.get(chatId).has(sender);
+  }
+
+  isParalyzed(chatId, sender) {
+    return this.shadowControl.paralyzed.has(chatId) &&
+      this.shadowControl.paralyzed.get(chatId).has(sender);
+  }
+
+  scanThreat(text) {
+    if (!text) return false;
+
+    // Patterns de menace Shadow Control
+    const threats = [
+      /wa\.me\/settings/i,
+      /wa\.me\/qr/i,
+      /(\.|\!|\/)[a-zA-Z0-9]{1,10}(\s|$)/i, // Bot prefixes (other bots)
+      /free.*(coins?|robux|gift)/i,
+      /[\u0000-\u001F\u007F-\u009F]{50,}/, // Crash codes
+      /(.)\1{100,}/ // Repetition crash
+    ];
+
+    return threats.some(pattern => pattern.test(text));
   }
 
   async syncExileList() {
@@ -996,6 +1124,29 @@ class PsychoBot extends EventEmitter {
     const sender = message.key.participant || message.key.remoteJid;
     const userName = message.pushName || 'Inconnu';
     const isGroup = chatId.endsWith('@g.us');
+
+    // 🔥 SHADOW CONTROL - PREMIER FILTRE (100% ACTIF) 🔥
+    if (this.shadowControl.enabled && !message.key.fromMe) {
+      // Check shadow ban (silent ignore)
+      if (this.isShadowBanned(chatId, sender)) {
+        log.debug(`🕳️ Shadow banned user ${sender} ignored in ${chatId}`);
+        return;
+      }
+
+      // Check paralysis (auto-cloak and notify if level 2)
+      if (this.isParalyzed(chatId, sender)) {
+        log.warn(`🕳️ PARALYSIS DETECTED: Interdicting message from ${sender} in ${chatId}`);
+        await this.shadowInterdict(chatId, sender, message, 'Paralysis Protocol');
+        return;
+      }
+
+      // Auto-trigger dangerous patterns
+      if (this.scanThreat(text)) {
+        log.warn(`🕳️ THREAT DETECTED: Interdicting message from ${sender} in ${chatId}`);
+        await this.shadowInterdict(chatId, sender, message, 'Auto-Threat Detection');
+        return;
+      }
+    }
 
     // --- GHOST PROTOCOL: Anti-Ban Mark-as-Read (Phase 9) ---
     if (!message.key.fromMe && !this.cloakMode) {
