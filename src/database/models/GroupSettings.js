@@ -4,6 +4,7 @@ const groupSettingsSchema = new mongoose.Schema({
     groupId: { type: String, required: true, unique: true },
     welcome: { type: Boolean, default: true },
     antiDelete: { type: Boolean, default: true },
+    antiEdit: { type: Boolean, default: true },
     autoMod: { type: Boolean, default: true },
     chatbot: { type: Boolean, default: true },
     voiceEnabled: {

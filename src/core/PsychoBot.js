@@ -834,8 +834,11 @@ class PsychoBot extends EventEmitter {
 
             // Only notify if text actually changed
             if (oldText !== newText) {
-              log.info(`Message edit detected: ${messageId} in ${chatId}`);
-              await this.notifyMessageEdit(chatId, cachedMessage.sender, oldText, newText);
+              const settings = await this.getGroupSettings(chatId);
+              if (settings.antiEdit) {
+                log.info(`Message edit detected: ${messageId} in ${chatId}`);
+                await this.notifyMessageEdit(chatId, cachedMessage.sender, oldText, newText);
+              }
 
               // Update cache
               cachedMessage.text = newText;

@@ -16,9 +16,10 @@ class LocalSettings {
         const defaults = {
             voiceEnabled: false,
             chatbot: true, // Default to true
-            welcome: true,
+            welcome: { type: Boolean, default: true },
             autoMod: true,
-            antiDelete: true
+            antiDelete: true,
+            antiEdit: true
         };
         // Merge stored data on top of defaults
         return { ...defaults, ...(this.data[groupId] || {}) };

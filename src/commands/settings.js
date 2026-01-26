@@ -9,18 +9,31 @@ module.exports = {
   isGroupOnly: true,
   async execute({ chatId, bot, message, args }) {
     try {
-      let settings = await GroupSettings.findOne({ groupId: chatId });
-      if (!settings) {
-        settings = await GroupSettings.create({ groupId: chatId });
-      }
+      let settings = await bot.getGroupSettings(chatId);
 
       const toggle = args[0]?.toLowerCase();
-      const validToggles = ['welcome', 'antidelete', 'automod', 'chatbot'];
+      const validToggles = ['welcome', 'antidelete', 'antiedit', 'automod', 'chatbot'];
 
       if (toggle && validToggles.includes(toggle)) {
-        const key = toggle === 'antidelete' ? 'antiDelete' : toggle === 'automod' ? 'autoMod' : toggle;
+        // Mapping toggle names to schema keys
+        const mapping = {
+          'antidelete': 'antiDelete',
+          'antiedit': 'antiEdit',
+          'automod': 'autoMod',
+          'welcome': 'welcome',
+          'chatbot': 'chatbot'
+        };
+        const key = mapping[toggle];
+
         settings[key] = !settings[key];
-        await settings.save();
+
+        // Save logic (handle both Mongoose and Plain Object)
+        if (typeof settings.save === 'function') {
+          await settings.save();
+        } else {
+          const LocalSettings = require('../database/LocalSettings');
+          LocalSettings.set(chatId, { [key]: settings[key] });
+        }
 
         return await bot.sendMessage(chatId, {
           text: `* \`${bot.botName || 'Diane'}\` *\n\n*MISE À JOUR DES PARAMÈTRES*\nParamètre \`${toggle.toUpperCase()}\` : ${settings[key] ? 'ACTIF ✅' : 'INACTIF ❌'}\n\nConfiguration enregistrée avec succès.`
@@ -37,6 +50,9 @@ module.exports = {
         ``,
         `🗑️ Anti-Delete : ${settings.antiDelete ? '`ACTIF ✅`' : '`INACTIF ❌`'}`,
         `   Commande : \`*settings antidelete\``,
+        ``,
+        `✏️ Anti-Edit : ${settings.antiEdit ? '`ACTIF ✅`' : '`INACTIF ❌`'}`,
+        `   Commande : \`*settings antiedit\``,
         ``,
         `🛡️ Auto-Mod : ${settings.autoMod ? '`ACTIF ✅`' : '`INACTIF ❌`'}`,
         `   Commande : \`*settings automod\``,
