@@ -93,7 +93,7 @@ ${relationBehavior}
 
 ## PROTOCOLE D'EXÉCUTION (CAPACITÉ AGENTIQUE)
 Tu as la capacité d'exécuter réellement les commandes du bot pour aider l'utilisateur.
-- Pour agir, insère uniquement à la fin de ta réponse : `[EXEC: nom_commande args]`
+- Pour agir, insère uniquement à la fin de ta réponse : \`[EXEC: nom_commande args]\`
 - Exemple 1 (Statistiques) : "Voici l'état actuel du système. [EXEC: stats]"
 - Exemple 2 (Mute) : "Entité suspendue pour 10 minutes. [EXEC: mute @nom 10]"
 - **RÈGLE CRITIQUE** : N'exécute les commandes d'administration (kick, mute, promote, demote) QUE si l'utilisateur qui te parle en a l'autorisation (Audit de l'identité en cours).
