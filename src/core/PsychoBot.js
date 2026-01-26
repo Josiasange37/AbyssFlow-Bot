@@ -1400,11 +1400,15 @@ class PsychoBot extends EventEmitter {
           const groupSettings = isGroup ? await this.getGroupSettings(chatId) : null;
           const voiceAllowed = !isGroup || (groupSettings && groupSettings.voiceEnabled); // DM always allowed, Group depends on settings
 
+          // Detect explicit voice request
+          const voiceKeywords = ['vocal', 'vocale', 'audio', 'parle', 'écoute', 'dis', 'synthèse'];
+          const isExplicitVoiceRequest = text && voiceKeywords.some(kw => text.toLowerCase().includes(kw));
+
           const shouldVoice = voiceAllowed &&
-            finalResponse.length < 400 &&
+            finalResponse.length < 500 && // Slightly increased length limit
             !finalResponse.includes('```') &&
             !finalResponse.includes('[IMAGE]') &&
-            Math.random() < 0.35; // 35% chance
+            (isExplicitVoiceRequest || Math.random() < 0.50); // Explicit OR 50% random chance
 
           if (shouldVoice) {
             await this.sock.sendPresenceUpdate('recording', chatId).catch(() => { });
