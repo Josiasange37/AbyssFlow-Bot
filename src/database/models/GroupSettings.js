@@ -6,7 +6,13 @@ const groupSettingsSchema = new mongoose.Schema({
     antiDelete: { type: Boolean, default: true },
     autoMod: { type: Boolean, default: true },
     chatbot: { type: Boolean, default: true },
-    economy: { type: Boolean, default: true }
+    voiceEnabled: {
+        type: Boolean,
+        default: false
+    },
+    ai_personality: {
+        type: Boolean, default: true
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('GroupSettings', groupSettingsSchema);

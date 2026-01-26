@@ -11,6 +11,7 @@ const Memory = require('./Memory');
 const GroqProvider = require('./brain/providers/GroqProvider');
 const MistralProvider = require('./brain/providers/MistralProvider');
 const PollinationsProvider = require('./brain/providers/PollinationsProvider');
+const OpenRouterProvider = require('./brain/providers/OpenRouterProvider'); // New Provider
 const Persona = require('./brain/Persona');
 
 /**
@@ -33,6 +34,7 @@ class PsychoBrain {
 
         this.providerHealth = {
             groq: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
+            openrouter: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
             mistral: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
             github: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
             cohere: { available: false, errors: 0, lastError: 0, cooldownUntil: 0, failCount: 0 },
@@ -54,7 +56,12 @@ class PsychoBrain {
             this.providerHealth.groq.available = true;
         }
 
-        // 2. Mistral (Secondary + Vision + Tools)
+        // 2. OpenRouter (Primary Powerful Models)
+        if (OpenRouterProvider.init()) {
+            this.providerHealth.openrouter.available = true;
+        }
+
+        // 3. Mistral (Secondary + Vision + Tools)
         if (MistralProvider.init()) {
             this.providerHealth.mistral.available = true;
         }
@@ -251,8 +258,9 @@ class PsychoBrain {
             providers.push({ name: 'mistral', fn: () => MistralProvider.process(finalText, chatHistory, media, systemPrompt) });
             providers.push({ name: 'github', fn: () => this.processGitHub(finalText, chatHistory, media) });
         } else {
-            // Text: Groq -> Mistral
+            // Text: Groq (Fastest) -> OpenRouter (Powerful) -> Mistral (Backup)
             providers.push({ name: 'groq', fn: () => GroqProvider.process(finalText, chatHistory, systemPrompt) });
+            providers.push({ name: 'openrouter', fn: () => OpenRouterProvider.process(finalText, chatHistory, systemPrompt) });
             providers.push({ name: 'mistral', fn: () => MistralProvider.process(finalText, chatHistory, null, systemPrompt) });
         }
 

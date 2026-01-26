@@ -1,4 +1,4 @@
-# 🛡️ Commandes Administrateur - AbyssFlow
+# 🛡️ Commandes Administrateur
 
 ## 🔐 Système de Permissions
 
@@ -499,17 +499,6 @@ Bienvenue dans la team! On est contents de t'avoir avec nous! 🔥
 
 ---
 
-## 🔮 Commandes à Venir
-
-- `*antilink` - Protection anti-liens
-- `*antibot` - Bloquer les autres bots
-- `*mute @user` - Mute un membre
-- `*kick @user` - Expulser un membre
-- `*promote @user` - Promouvoir en admin
-- `*demote @user` - Rétrograder un admin
-- `*tagall` - Mentionner tous les membres
-- `*rules` - Afficher/définir les règles
-
 ---
 
-**Créé avec 💧 par Josias Almight - Water Hashira**
+**Créé par Josias Almight**

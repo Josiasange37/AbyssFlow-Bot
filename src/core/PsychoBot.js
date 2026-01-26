@@ -16,11 +16,12 @@ const Memory = require('./Memory');
 const { connectDB } = require('../database');
 const GroupSettings = require('../database/models/GroupSettings');
 const UserStats = require('../database/models/UserStats');
-const Blacklist = require('../database/models/Blacklist');
-const Warning = require('../database/models/Warning');
+
 const useMongoAuthState = require('./mongoAuth');
 const qrcode = require('qrcode-terminal');
-const ProtocolEngine = require('./ProtocolEngine');
+const VoiceManager = require('../utils/VoiceManager'); // Import VoiceManager
+const LocalSettings = require('../database/LocalSettings');
+
 
 const baileysLogger = pino({ level: 'silent' });
 
@@ -51,29 +52,10 @@ class PsychoBot extends EventEmitter {
     this.messageCache = new Map();
     this.maxCacheSize = 1000;
     this.metadataCache = new Map(); // Cache for group participants
+    this.settingsCache = new Map(); // Cache for group settings
     this.dramaTracker = new Map(); // Track message spikes for drama detection
     this.cloakMode = false; // Phase 2: Stealth Cloaking
 
-    // Protocol Engine (Phase 17)
-    this.shadowBannedUsers = this.shadowBannedUsers || new Set();
-    this.blackoutList = this.blackoutList || new Set();
-    this.mutedUsers = this.mutedUsers || new Map();
-    this.paralyzedUsers = this.paralyzedUsers || new Map();
-    this.vexedUsers = this.vexedUsers || new Map();
-    this.watchdogList = this.watchdogList || new Set();
-    this.protocolEngine = new ProtocolEngine(this);
-
-    // 🔥 SHADOW CONTROL - PHASE 17+ (100% FONCTIONNEL) 🔥
-    this.shadowControl = {
-      enabled: true,
-      stealthMode: false,
-      blackoutActive: new Set(),
-      shadowBanned: new Map(), // chatId -> Set<userId>
-      paralyzed: new Map(),    // chatId -> Set<userId>
-      cloakedMessages: new Set(),
-      controlLevel: 0,         // 0=normal, 1=shadow, 2=total
-      lastSweep: 0
-    };
 
     if (!CONFIG.owners.length) {
       log.warn(`[${this.sessionId}] No owners configured.`);
@@ -86,7 +68,7 @@ class PsychoBot extends EventEmitter {
     }).catch(e => log.error(`[${this.sessionId}] DB Init Error:`, e.message));
     this.startAutoStatus();
     this.startGhostCore();
-    this.startShadowControl(); // 🔥 SHADOW CONTROL ACTIVÉ
+
   }
 
   /**
@@ -98,120 +80,6 @@ class PsychoBot extends EventEmitter {
     return jid.split(':')[0].split('@')[0];
   }
 
-  // 🔥 SHADOW CONTROL CORE ENGINE 🔥
-  startShadowControl() {
-    log.info(`[${this.sessionId}] 🔥 SHADOW CONTROL ACTIVATED - Phase 17+`);
-
-    // Stealth sweep every 5 minutes
-    cron.schedule('*/5 * * * *', () => this.shadowSweep());
-
-    // Auto-control level adjustment every 2 hours
-    cron.schedule('0 */2 * * *', () => this.adjustControlLevel());
-  }
-
-  shadowSweep() {
-    const now = Date.now();
-    if (now - this.shadowControl.lastSweep < 5 * 60 * 1000) return;
-
-    this.shadowControl.lastSweep = now;
-
-    // Auto-clean old shadow bans (24h TTL)
-    for (const [chatId, users] of this.shadowControl.shadowBanned.entries()) {
-      if (users instanceof Map) {
-        for (const [userId, timestamp] of users.entries()) {
-          if (now - timestamp > 24 * 60 * 60 * 1000) {
-            users.delete(userId);
-          }
-        }
-      }
-    }
-
-    log.info(`[${this.sessionId}] 🕳️ Shadow Sweep completed`);
-  }
-
-  adjustControlLevel() {
-    const activeChats = this.shadowControl.shadowBanned.size;
-    const totalThreats = Array.from(this.shadowControl.shadowBanned.values())
-      .reduce((sum, users) => sum + (users.size || 0), 0);
-
-    if (totalThreats > 50) this.shadowControl.controlLevel = 2;
-    else if (activeChats > 10) this.shadowControl.controlLevel = 1;
-    else this.shadowControl.controlLevel = 0;
-
-    log.info(`[${this.sessionId}] 🎭 Shadow Control Level: ${this.shadowControl.controlLevel}`);
-  }
-
-  // 🔥 SHADOW CONTROL - INTERDICTION TOTALE 🔥
-  async shadowInterdict(chatId, sender, message, reason = 'Shadow Control') {
-    if (!this.shadowControl.enabled) return false;
-
-    log.warn(`🕳️ SHADOW CONTROL: ${reason} -> ${sender} in ${chatId}`);
-
-    // 1. IMMEDIATE MESSAGE CLOAKING
-    try {
-      await this.sock.sendMessage(chatId, { delete: message.key });
-      this.shadowControl.cloakedMessages.add(message.key.id);
-    } catch (e) { log.debug('Failed to cloak message:', e.message); }
-
-    // 2. SHADOW BAN (Silent)
-    if (!this.shadowControl.shadowBanned.has(chatId)) {
-      this.shadowControl.shadowBanned.set(chatId, new Map());
-    }
-    this.shadowControl.shadowBanned.get(chatId).set(sender, Date.now());
-
-    // 3. LEVEL 2: TOTAL BLACKOUT
-    if (this.shadowControl.controlLevel === 2) {
-      this.shadowControl.blackoutActive.add(chatId);
-      this.sendShadowNotification(chatId, sender, reason);
-    }
-
-    // 4. PARALYSIS PROTOCOL
-    if (!this.shadowControl.paralyzed.has(chatId)) {
-      this.shadowControl.paralyzed.set(chatId, new Set());
-    }
-    this.shadowControl.paralyzed.get(chatId).add(sender);
-
-    return true;
-  }
-
-  sendShadowNotification(chatId, sender, reason) {
-    const shadowMsg = `🕳️ *SHADOW CONTROL ACTIVATED*\n\n` +
-      `👤 *Cible:* @${sender.split('@')[0]}\n` +
-      `⚠️ *Violation:* ${reason}\n\n` +
-      `_Messages interceptés et utilisateur en quarantaine silencieuse._\n\n` +
-      `🌑 *Psycho Bot Security*`;
-
-    this.sendMessage(chatId, {
-      text: shadowMsg,
-      mentions: [sender]
-    });
-  }
-
-  isShadowBanned(chatId, sender) {
-    return this.shadowControl.shadowBanned.has(chatId) &&
-      this.shadowControl.shadowBanned.get(chatId).has(sender);
-  }
-
-  isParalyzed(chatId, sender) {
-    return this.shadowControl.paralyzed.has(chatId) &&
-      this.shadowControl.paralyzed.get(chatId).has(sender);
-  }
-
-  scanThreat(text) {
-    if (!text) return false;
-
-    // Patterns de menace Shadow Control
-    const threats = [
-      /wa\.me\/settings/i,
-      /wa\.me\/qr/i,
-      /(\.|\!|\/)[a-zA-Z0-9]{1,10}(\s|$)/i, // Bot prefixes (other bots)
-      /free.*(coins?|robux|gift)/i,
-      /[\u0000-\u001F\u007F-\u009F]{50,}/, // Crash codes
-      /(.)\1{100,}/ // Repetition crash
-    ];
-
-    return threats.some(pattern => pattern.test(text));
-  }
 
   async syncExileList() {
     if (mongoose.connection.readyState !== 1) return;
@@ -249,21 +117,6 @@ class PsychoBot extends EventEmitter {
   /**
    * Status Update Handler for STALKER (Phase 11)
    */
-  async onPresenceUpdate(update) {
-    const { id, presences } = update;
-    if (!this.stalkerList || !this.stalkerList.has(id)) return;
-
-    // The 'presences' object contains statuses for various platforms, find the newest
-    const presenceData = Object.values(presences)[0];
-    if (!presenceData) return;
-
-    const status = presenceData.lastKnownPresence || presenceData.type;
-    const alertText = `👁️ *STALKER ALERT:* @${id.split('@')[0]} est désormais *${status.toUpperCase()}*.`;
-
-    // Find owner JID
-    const ownerJid = CONFIG.owners[0] + '@s.whatsapp.net';
-    await this.sock.sendMessage(ownerJid, { text: alertText, mentions: [id] });
-  }
 
   getGroupSettings(groupId) {
 
@@ -392,7 +245,7 @@ class PsychoBot extends EventEmitter {
       this.sock.ev.on('messages.upsert', (payload) => this.onMessages(payload));
       this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
-      this.sock.ev.on('presence.update', (update) => this.onPresenceUpdate(update));
+
 
 
       this.pendingReconnect = false;
@@ -494,21 +347,39 @@ class PsychoBot extends EventEmitter {
   }
 
   async getGroupSettings(groupId) {
-    // Return early with defaults if DB is not connected to avoid buffering timeouts
-    if (mongoose.connection.readyState !== 1) {
-      return { welcome: true, antiDelete: true, autoMod: true, chatbot: true };
+    if (this.settingsCache.has(groupId)) {
+      const cached = this.settingsCache.get(groupId);
+      if (Date.now() - cached.time < 5 * 60 * 1000) return cached.data;
     }
 
+    let settings;
     try {
-      let settings = await GroupSettings.findOne({ groupId });
-      if (!settings) {
-        settings = await GroupSettings.create({ groupId });
+      if (require('mongoose').connection.readyState === 1) {
+        settings = await GroupSettings.findOne({ groupId });
       }
-      return settings;
-    } catch (error) {
-      log.error('Failed to get group settings:', error.message);
-      return { welcome: true, antiDelete: true, autoMod: true, chatbot: true }; // Fallback
+    } catch (e) {
+      log.error(`DB Error fetch settings: ${e.message}`);
     }
+
+    // Fallback to Local Settings if DB failed or returned null/no connexion
+    if (!settings && require('mongoose').connection.readyState !== 1) {
+      const localData = LocalSettings.get(groupId);
+      if (localData) {
+        settings = localData; // Use plain object
+      }
+    }
+
+    // Default if nothing found anywhere
+    if (!settings) {
+      if (require('mongoose').connection.readyState === 1) {
+        settings = new GroupSettings({ groupId }); // Just an instance, didn't save yet
+      } else {
+        settings = { groupId, voiceEnabled: false };
+      }
+    }
+
+    this.settingsCache.set(groupId, { data: settings, time: Date.now() });
+    return settings;
   }
 
   async onGroupParticipantsUpdate(update) {
@@ -519,50 +390,6 @@ class PsychoBot extends EventEmitter {
 
       for (const participant of participants) {
         const normalizedParticipant = this.normalizeJid(participant);
-        // --- BLACKHOLE: AUTOMATED INTERDICTION ---
-        if (action === 'add') {
-          // --- PERMANENT EXILE: Soft Global Blacklist (Phase 12) ---
-          if (this.exileList && (this.exileList.has(participant) || this.exileList.has(normalizedParticipant))) {
-            log.warn(`🚨 PERMANENT-EXILE: Expelling ${participant} from ${groupId}.`);
-            const isBotAdmin = await this.isBotGroupAdmin(groupId);
-            if (isBotAdmin) {
-              await this.sock.groupParticipantsUpdate(groupId, [participant], 'remove');
-              return;
-            }
-          }
-
-          if (mongoose.connection.readyState !== 1) continue; // DB guard
-
-          const isBlacklisted = await Blacklist.findOne({
-            $or: [
-              { userId: participant },
-              { userId: normalizedParticipant }
-            ]
-          });
-
-          if (isBlacklisted) {
-            log.warn(`🕳️ BLACKHOLE: Blacklisted user ${participant} tried to join ${groupId}. Purging...`);
-            const isBotAdmin = await this.isBotGroupAdmin(groupId);
-            if (isBotAdmin) {
-              await this.sock.groupParticipantsUpdate(groupId, [participant], 'remove');
-              await this.sendMessage(groupId, { text: `🕳️ *BLACKHOLE TRIGGERED:* La cible @${participant.split('@')[0]} est bannie de tous les secteurs AbyssFlow. \n\n*Raison:* ${isBlacklisted.reason}`, mentions: [participant] });
-              continue; // Skip further processing for this user
-            }
-          }
-        }
-
-        // --- OVERRIDE: ADMIN ENFORCEMENT ---
-        if (this.overrideGroups && this.overrideGroups.has(groupId) && !this.isOwner(participant)) {
-          if (action === 'promote' || action === 'demote') {
-            log.warn(`🦾 OVERRIDE: Unauthorized admin change detected for ${participant} in ${groupId}. Reverting...`);
-            const isBotAdmin = await this.isBotGroupAdmin(groupId);
-            if (isBotAdmin) {
-              const reverseAction = action === 'promote' ? 'demote' : 'promote';
-              await this.sock.groupParticipantsUpdate(groupId, [participant], reverseAction);
-              await this.sendMessage(groupId, { text: `🦾 *OVERRIDE ACTIVÉ:* Action de privilège non autorisée pour @${participant.split('@')[0]} annulée.`, mentions: [participant] });
-            }
-          }
-        }
 
         // Check for antibot when someone is added
         if (action === 'add') {
@@ -1125,116 +952,6 @@ class PsychoBot extends EventEmitter {
     const userName = message.pushName || 'Inconnu';
     const isGroup = chatId.endsWith('@g.us');
 
-    // 🔥 SHADOW CONTROL - PREMIER FILTRE (100% ACTIF) 🔥
-    if (this.shadowControl.enabled && !message.key.fromMe) {
-      // Check shadow ban (silent ignore)
-      if (this.isShadowBanned(chatId, sender)) {
-        log.debug(`🕳️ Shadow banned user ${sender} ignored in ${chatId}`);
-        return;
-      }
-
-      // Check paralysis (auto-cloak and notify if level 2)
-      if (this.isParalyzed(chatId, sender)) {
-        log.warn(`🕳️ PARALYSIS DETECTED: Interdicting message from ${sender} in ${chatId}`);
-        await this.shadowInterdict(chatId, sender, message, 'Paralysis Protocol');
-        return;
-      }
-
-      // Auto-trigger dangerous patterns
-      if (this.scanThreat(text)) {
-        log.warn(`🕳️ THREAT DETECTED: Interdicting message from ${sender} in ${chatId}`);
-        await this.shadowInterdict(chatId, sender, message, 'Auto-Threat Detection');
-        return;
-      }
-    }
-
-    // --- GHOST PROTOCOL: Anti-Ban Mark-as-Read (Phase 9) ---
-    if (!message.key.fromMe && !this.cloakMode) {
-      await this.sock.readMessages([message.key]);
-    }
-
-
-    // --- PROTOCOL ENGINE: INTERDICTION (Phase 17) ---
-    if (await this.protocolEngine.evaluateInterdiction(chatId, sender, message, text)) {
-      return; // Protocol Neutralization Active
-    }
-
-    // --- WATCHDOG: Global Surveillance Alert (Phase 10) ---
-
-    if (this.watchdogList && this.watchdogList.has(sender) && !message.key.fromMe) {
-      (async () => {
-        const groupName = isGroup ? (await this.sock.groupMetadata(chatId)).subject : 'DM';
-        const alertText = `👁️ *WATCHDOG ALERT:* @${sender.split('@')[0]} a été détecté dans *${groupName}*.\n\n📖 *Message:* ${text || '[Media]'}`;
-        // Find owner JID
-        const ownerJid = CONFIG.owners[0] + '@s.whatsapp.net';
-        await this.sock.sendMessage(ownerJid, { text: alertText, mentions: [sender] });
-      })();
-    }
-
-
-    // --- DRAMA DETECTOR (Popcorn Mode) ---
-    if (isGroup && !message.key.fromMe) {
-      const now = Date.now();
-      let tracker = this.dramaTracker.get(chatId) || { count: 0, lastTime: now, cooldown: 0 };
-
-      // Reset if too much time passed (5s window for better burst detection)
-      if (now - tracker.lastTime > 5000) {
-        tracker.count = 0;
-      }
-
-      tracker.count++;
-      tracker.lastTime = now;
-
-      // Trigger if > 8 msg in 5 sec (Burst) AND not in cooldown
-      if (tracker.count > 8 && now > tracker.cooldown) {
-        log.info(`🎭 INTELLIGENT MEDIATION TRIGGERED in ${chatId}`);
-
-        // Asynchronous Intelligent Intervention
-        (async () => {
-          try {
-            const history = await Brain.getHistory(chatId);
-            if (history.length < 5) return;
-
-            const conversationContext = history.filter(m => m.role === 'user').slice(-10).map(m => m.text).join('\n');
-            const mediationPrompt = `[DRAMA DETECTOR - ANALYSE D'AMBIANCE]
-            Il y a une forte explosion de messages dans ce groupe. Analyse l'ambiance des 10 derniers messages ci-dessous.
-            - Si c'est du drama ou une dispute : Interviens avec calme, sagesse et une touche d'humour pour calmer les tensions.
-            - Si c'est juste du spam ou de la joie : Réagis avec un emoji cool ou une petite phrase d'encouragement.
-            - Si c'est une discussion intense mais saine : Fais un mini résumé (1 ligne) pour aider ceux qui débarquent.
-            
-            HISTORIQUE RÉCENT :
-            ${conversationContext}`;
-
-            const intervention = await Brain.process(mediationPrompt, chatId, null, "Médiateur du Clan");
-            if (intervention) {
-              const cleanInt = intervention.replace(/\[MEMORY: .*?\]/g, '').trim();
-              await this.sendMessage(chatId, { text: `🎭 *MÉDIATEUR D'ALLIANCE* 🤖\n\n${cleanInt}` });
-            }
-          } catch (err) { log.error('Mediation failed:', err.message); }
-        })();
-
-        tracker.cooldown = now + 120_000; // 2 min cooldown for mediation
-        tracker.count = 0;
-      }
-      this.dramaTracker.set(chatId, tracker);
-    }
-
-    // --- ENFORCEMENT WRAPPER (Phase 17) ---
-    // Note: ProtocolEngine handled Mute/Paralyze above.
-
-    // --- VEX: Automated Harassment (Phase 4/5) ---
-    if (this.vexedUsers && this.vexedUsers.has(chatId)) {
-      const vexedList = this.vexedUsers.get(chatId);
-      if (vexedList.has(sender) && !message.key.fromMe && !text?.startsWith(CONFIG.prefix)) {
-        log.info(`Vexed user ${sender} sent message in ${chatId}. Triggering AI Roast...`);
-        (async () => {
-          const roast = await Brain.process(`[VEX PROTOCOL] L'utilisateur @${sender.split('@')[0]} a encore parlé. Fais lui un roast technique ultra humiliant car il est dans la blacklist.`, chatId, null, "Auditeur");
-          if (roast) {
-            await this.sendMessage(chatId, { text: `💀 *HUMILIATION PROTOCOLAIRE* 💀\n\n${roast}`, mentions: [sender] }, { quoted: message });
-          }
-        })();
-      }
-    }
 
 
     const isOwner = this.isOwner(sender);
@@ -1267,8 +984,7 @@ class PsychoBot extends EventEmitter {
     // Sovereign Assistant Rule (Passive Assistance)
     const isNameMentioned = text && (
       normalizedText.includes(this.botName.toLowerCase()) ||
-      normalizedText.includes('psycho') ||
-      normalizedText.includes('bot')
+      normalizedText.includes('diane')
     );
 
     // AI only responds to Direct Interaction or Name Mention in groups
@@ -1309,11 +1025,7 @@ class PsychoBot extends EventEmitter {
     const isGroupAdmin = isGroup ? await this.isGroupAdmin(chatId, sender) : false;
     const settings = isGroup ? await this.getGroupSettings(chatId) : null;
 
-    // --- AUTO MODÉRATION 2.0: Check for spam/scams ---
-    if (isGroup && settings?.autoMod && !isOwner && !isGroupAdmin) {
-      const isSafe = await this.checkAutoMod(chatId, sender, text, message);
-      if (!isSafe) return; // Stop processing if message was handled/deleted
-    }
+
 
     // --- XP & LEVELING: Track group activity ---
     if (isGroup && !message.key.fromMe) {
@@ -1403,6 +1115,7 @@ class PsychoBot extends EventEmitter {
       }
 
       // --- AI CONTEXT ENHANCEMENT: Group Participants ---
+
       // Immediate feedback: Show typing status while processing
       if (!this.cloakMode) await this.sock.sendPresenceUpdate('composing', chatId);
 
@@ -1430,6 +1143,8 @@ class PsychoBot extends EventEmitter {
       }
 
       // Pass userName and availableCommands to Brain for Agentic Logic
+      // Show typing logic
+      await this.sock.sendPresenceUpdate('composing', chatId);
       let response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media, userName, availableCommands);
 
       if (response) {
@@ -1746,139 +1461,6 @@ class PsychoBot extends EventEmitter {
     }
   }
 
-  async checkAutoMod(chatId, sender, text, message) {
-    if (!text && !message.message?.contactMessage && !message.message?.contactsArrayMessage) return true;
-
-    const isOwner = this.isOwner(sender);
-    const isGroupAdmin = await this.isGroupAdmin(chatId, sender);
-    if (isOwner || isGroupAdmin) return true;
-
-    // --- SHIELD: ANTI-CRASH & EXPLOIT ENGINE ---
-
-    // 1. Binarios / Crash Strings Detection
-    // Detection of repetitive non-latin/symbol sequences often used in "travas"
-    const binaryPattern = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]{100,}/;
-    const extremeRepetition = /(.)\1{500,}/; // Same character repeated 500+ times
-
-    if (text && (binaryPattern.test(text) || extremeRepetition.test(text) || text.length > 15000)) {
-      log.warn(`🛡️ SHIELD: Crash code detected from ${sender} in ${chatId}`);
-      await this.neutralizeThreat(chatId, sender, message, "Crash Code / Binario");
-      return false;
-    }
-
-    // 2. Malicious Links / Freeze Links
-    const freezeLinks = [
-      /wa\.me\/settings/i,
-      /wa\.me\/qr/i,
-      /chat\.whatsapp\.com\/invite\/[a-zA-Z0-0]{50,}/, // Malformed long invite
-    ];
-
-    if (text && freezeLinks.some(p => p.test(text))) {
-      log.warn(`🛡️ SHIELD: Freeze link detected from ${sender} in ${chatId}`);
-      await this.neutralizeThreat(chatId, sender, message, "Freeze Link Exploit");
-      return false;
-    }
-
-    // 3. VCard / Contact Spam (Crash method)
-    if (message.message?.contactMessage || message.message?.contactsArrayMessage) {
-      const vcard = message.message?.contactMessage?.vcard || "";
-      if (vcard.length > 5000 || (message.message?.contactsArrayMessage?.contacts?.length > 10)) {
-        log.warn(`🛡️ SHIELD: VCard Spam detected from ${sender} in ${chatId}`);
-        await this.neutralizeThreat(chatId, sender, message, "VCard/Contact Crash Exploit");
-        return false;
-      }
-    }
-
-    // 4. Standard Scam detection (Original logic)
-    const scamPatterns = [/free-robux/i, /gift-card/i, /crypto-giveaway/i];
-    if (text && scamPatterns.some(p => p.test(text))) {
-      try {
-        await this.sock.sendMessage(chatId, { delete: message.key });
-        await this.addWarning(chatId, sender, "Lien suspect/Scam détecté");
-        log.info(`Auto-Mod: Deleted scam message from ${sender} in ${chatId}`);
-        return false;
-      } catch (e) { log.debug('Failed to delete scam message:', e.message); }
-    }
-
-    // --- SENTINEL-ULTRA: Anti-Bot Aggression (Phase 12) ---
-    const hostilePrefixes = ['.', '!', '/'];
-    if (text && hostilePrefixes.some(p => text.startsWith(p)) && !text.startsWith(CONFIG.prefix)) {
-      if (!isOwner && !isGroupAdmin) {
-        log.warn(`🤖 SENTINEL-ULTRA: Neutralizing unauthorized bot call from ${sender}`);
-        await this.neutralizeThreat(chatId, sender, message, "Unauthorized Automated Activity (Sentinel-Ultra)");
-        return false;
-      }
-    }
-
-
-    // --- AUTO-PURGE: Zero Tolerance (Phase 11) ---
-    if (this.autoPurgeChats && this.autoPurgeChats.has(chatId)) {
-      const hasLink = text && (text.includes('http://') || text.includes('https://') || text.includes('wa.me/'));
-      if (hasLink) {
-        log.warn(`🛡️ AUTO-PURGE: Unauthorized link from ${sender} in ${chatId}`);
-        await this.neutralizeThreat(chatId, sender, message, "Auto-Purge: Unauthorized Content (Link)");
-        return false;
-      }
-    }
-
-    return true;
-
-
-  }
-
-  /**
-   * Neutralizes a threat by deleting the message and kicking the user
-   */
-  async neutralizeThreat(chatId, sender, message, reason) {
-    try {
-      // 1. Delete immediately
-      await this.sock.sendMessage(chatId, { delete: message.key });
-
-      // 2. Notify
-      const userTag = `@${sender.split('@')[0]}`;
-      await this.sendMessage(chatId, {
-        text: `🛡️ *SHIELD PROTOCOL ACTIVATED* 🛡️\n\n⚠️ *Menace détectée:* ${reason}\n👤 *Source:* ${userTag}\n\n*Action:* Suppression immédiate et bannissement du périmètre. \n\n_Sécurité AbyssFlow assurée._ ⚔️`,
-        mentions: [sender]
-      });
-
-      // 3. Kick
-      const isBotAdmin = await this.isBotGroupAdmin(chatId);
-      if (isBotAdmin) {
-        await this.sock.groupParticipantsUpdate(chatId, [sender], "remove");
-        log.info(`🛡️ SHIELD: User ${sender} kicked from ${chatId} for ${reason}`);
-      } else {
-        log.warn(`🛡️ SHIELD: Failed to kick ${sender} in ${chatId} - Bot is not admin`);
-      }
-    } catch (error) {
-      log.error('Shield neutralization error:', error.message);
-    }
-  }
-
-
-  async addWarning(groupId, userId, reason) {
-    try {
-      let stats = await Warning.findOne({ userId, groupId });
-      if (!stats) stats = new Warning({ userId, groupId });
-
-      stats.warnings += 1;
-      stats.reasons.push({ text: reason });
-      await stats.save();
-
-      const userTag = `@${userId.split('@')[0]}`;
-      const warnMsg = `⚠️ *AVERTISSEMENT* ⚠️\n\n👤 *Utilisateur:* ${userTag}\n🔰 *Raison:* ${reason}\n🚩 *Total:* ${stats.warnings}/3\n\n_Fais attention bg, à 3 avertissements c'est le kick automatique ! ⚔️_`;
-
-      await this.sendMessage(groupId, { text: warnMsg, mentions: [userId] });
-
-      if (stats.warnings >= 3) {
-        await this.sendMessage(groupId, { text: `💀 ${userTag} a atteint la limite. Adios mola ! 💨`, mentions: [userId] });
-        await this.sock.groupParticipantsUpdate(groupId, [userId], "remove");
-        // Reset warnings after kick
-        await Warning.deleteOne({ userId, groupId });
-      }
-    } catch (error) {
-      log.error('Failed to add warning:', error.message);
-    }
-  }
 
   async sendSafeMessage(jid, text, options = {}) {
     if (!this.sock) {
@@ -1919,7 +1501,7 @@ class PsychoBot extends EventEmitter {
     const now = Date.now();
     const normalized = normalizeNumber(jid);
     const history = this.commandHistory.get(normalized) || [];
-    const recent = history.filter((timestamp) => now - timestamp < RATE_WINDOW_MS);
+    const recent = history.filter((timestamp) => now - timestamp < CONFIG.RATE_WINDOW_MS);
 
     if (recent.length >= CONFIG.maxCommandsPerMinute) {
       this.commandHistory.set(normalized, recent);

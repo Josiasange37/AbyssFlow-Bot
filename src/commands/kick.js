@@ -29,7 +29,7 @@ module.exports = {
       const targetUser = target.split('@')[0].replace(/:/g, '');
       const isTargetOwner = config.owners.includes(targetUser);
       if (isTargetOwner) {
-        return await bot.sendSafeMessage(chatId, `🛡️ *PROTECTION INTÉGRALE:* Impossible de retirer un membre du Clan AbyssFlow.`);
+        return await bot.sendSafeMessage(chatId, `🛡️ *PROTECTION:* Impossible de retirer ce membre.`);
       }
 
       // 3. Normalisation JID robuste (gère LID et PN, supprime :0!)

@@ -1,4 +1,4 @@
-# 💧 AbyssFlow - Liste des Commandes
+# 💧 Liste des Commandes
 
 ## 📋 Commandes Publiques
 
@@ -114,23 +114,6 @@ Chaque commande peut avoir une bannière personnalisée:
 
 ---
 
-## 🚀 Prochaines Commandes (À Implémenter)
-
-- [ ] `*weather <ville>` - Météo en temps réel
-- [ ] `*quote` - Citation Water Hashira aléatoire
-- [ ] `*sticker` - Convertir image en sticker
-- [ ] `*translate <lang> <texte>` - Traduction
-- [ ] `*ai <question>` - Assistant IA
-- [ ] `*news` - Actualités tech
-- [ ] `*meme` - Générateur de memes
-
 ---
 
-## 📞 Support
-
-Pour plus d'informations:
-- Consultez `README.md`
-- Tapez `*help` dans WhatsApp
-- Visitez: https://xyber-clan.vercel.app/
-
-**Créé avec 💧 par Josias Almight - Water Hashira**
+**Créé par Josias Almight**

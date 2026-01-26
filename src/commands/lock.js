@@ -24,7 +24,7 @@ module.exports = {
 
             bot.lockedChats.add(chatId);
             await sock.sendMessage(chatId, {
-                text: '🔒 *PROTOCOLE LOCK ACTIVÉ:* Ce chat est désormais sous scellés AbyssFlow.\n\n_Toutes les commandes (hors Créateur) sont désactivées._'
+                text: '🔒 *CHAT VERROUILLÉ:* Ce chat est désormais restreint.'
             });
 
         } catch (error) {

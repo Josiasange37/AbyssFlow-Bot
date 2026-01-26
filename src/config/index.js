@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const CONFIG = {
-  botName: process.env.BOT_NAME || 'Psycho Bot',
+  botName: process.env.BOT_NAME || 'Diane',
   owners: process.env.BOT_OWNERS
     ? process.env.BOT_OWNERS.split(',').map((v) => v.trim()).filter(Boolean)
     : [],
@@ -40,6 +40,8 @@ const CONFIG = {
   cohereApiKey: process.env.COHERE_API_KEY || '',
   mistralApiKey: process.env.MISTRAL_API_KEY || '',
   mistralAgentId: process.env.MISTRAL_AGENT_ID || 'ag_019b5b38190670e7a41f56581ab8f052',
+  xaiApiKey: process.env.XAI_API_KEY || '',
+  openRouterKeys: [process.env.OPENROUTER_KEY_1, process.env.OPENROUTER_KEY_2].filter(Boolean),
   mongoUri: process.env.MONGO_URI || process.env.MONGODB_URI || '',
   renderUrl: process.env.RENDER_URL || '',
   port: process.env.PORT || 8080,
