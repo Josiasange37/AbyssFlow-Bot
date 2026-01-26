@@ -1801,9 +1801,14 @@ class PsychoBot extends EventEmitter {
           }
 
           if (messageText) {
+            // Simulation de frappe pour immersion
+            await this.sock.sendPresenceUpdate('composing', groupId);
+            const typingDelay = Math.min(5000, 1500 + messageText.length * 20); // Dynamic delay
+            await new Promise(resolve => setTimeout(resolve, typingDelay));
+
             await this.sendMessage(groupId, { text: messageText });
-            // Small delay to avoid rate limits
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Small cooldown between groups
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
         } catch (err) {
           log.error(`Failed to send broadcast to ${groupId}:`, err.message);
@@ -1825,8 +1830,8 @@ class PsychoBot extends EventEmitter {
     this.morningTask = cron.schedule('0 5 * * *', async () => {
       log.info('🌅 Morning greeting triggered');
       if (Brain) {
-        // Pass generator function for unique messages per group
-        await this.broadcast(async () => await Brain.generateAutoMessage('morning'));
+        // Pass generator function with groupId context
+        await this.broadcast(async (gid) => await Brain.generateAutoMessage('morning', gid));
       }
     }, { timezone: "Africa/Douala" });
 
@@ -1834,8 +1839,8 @@ class PsychoBot extends EventEmitter {
     this.midnightTask = cron.schedule('0 0 * * *', async () => {
       log.info('🌙 Midnight coding greeting triggered');
       if (Brain) {
-        // Pass generator function for unique messages per group
-        await this.broadcast(async () => await Brain.generateAutoMessage('midnight'));
+        // Pass generator function with groupId context
+        await this.broadcast(async (gid) => await Brain.generateAutoMessage('midnight', gid));
       }
     }, { timezone: "Africa/Douala" });
   }

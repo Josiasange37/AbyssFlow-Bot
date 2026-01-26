@@ -296,24 +296,42 @@ class PsychoBrain {
         return response;
     }
 
-    async generateAutoMessage(type) {
+    async generateAutoMessage(type, chatId = 'global') {
+        const history = await this.getHistory(chatId);
+        const recentContext = history.slice(-10).map(m => m.text).join('\n');
+
+        const moods = [
+            { name: 'Inspirant', instructions: 'Motive l’équipe sur la productivité, l’excellence et la discipline technique.' },
+            { name: 'Analytique', instructions: 'Propose une réflexion logique ou systémique sur le monde ou la technologie.' },
+            { name: 'Philosophique', instructions: 'Donne une citation de sagesse profonde qui incite à la réflexion existentielle.' },
+            { name: 'Émotionnel', instructions: 'Touche à l’humain, à la résilience et à la force intérieure. Très profond, limite à faire pleurer.' }
+        ];
+        const mood = moods[Math.floor(Math.random() * moods.length)];
+
         let prompt;
+        const baseRequest = `Génère une citation unique, courte (1-2 phrases) et percutante dans le style "Aphorisme Professionnel". 
+        C'est pour l'équipe XyberClan.
+        Humeur du jour : ${mood.name} (${mood.instructions}).
+        Format : Pas de salutations, juste la citation.
+        Contexte récent du groupe : ${recentContext || "Calme"}`;
+
         if (type === 'morning') {
-            prompt = "Génère un message de bonjour professionnel et chaleureux pour le groupe. Présente-toi comme Diane, l'assistante exécutive. Sois brève (1-2 phrases).";
+            prompt = `Bonjour stratégique. ${baseRequest}`;
         } else if (type === 'midnight') {
-            prompt = "Génère un message de clôture professionnel pour la fin de journée. Souhaite une bonne nuit au groupe. Sois brève (1-2 phrases).";
+            prompt = `Clôture nocturne. ${baseRequest}`;
         } else {
-            prompt = "Salue le groupe de manière professionnelle.";
+            prompt = baseRequest;
         }
 
         if (this.isProviderAvailable('groq')) {
             try {
-                return await GroqProvider.process(prompt, [], "Tu es Diane, une assistante exécutive professionnelle et efficace.");
+                const response = await GroqProvider.process(prompt, [], "Tu es Diane, une assistante exécutive dont la sagesse est profonde et le style impeccable. Tes mots doivent marquer les esprits.");
+                return response;
             } catch (e) {
                 log.error(`Auto message generation failed: ${e.message}`);
             }
         }
-        return type === 'morning' ? "Bonjour à tous. Je suis Diane, votre assistante exécutive. Je reste à votre entière disposition." : "La journée s'achève. Je vous souhaite une excellente soirée et un repos bien mérité.";
+        return type === 'morning' ? "L'excellence n'est pas un acte, c'est une habitude." : "Le repos est la pierre angulaire de la clarté mentale.";
     }
 
     async generateStatus() {
