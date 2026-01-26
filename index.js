@@ -110,12 +110,12 @@ app.delete('/api/sessions/:id', async (req, res) => {
 });
 
 // Health check & Root
-app.get('/', (req, res) => res.send('Psycho Bot Factory is Online! 🏭🚀'));
+app.get('/', (req, res) => res.send('DIANE EXECUTIVE ASSISTANT - SERVER ONLINE'));
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
 // Start the server
 app.listen(CONFIG.port, async () => {
-  log.info(`🚀 Factory Server running on port ${CONFIG.port}`);
+  log.info(`🚀 DIANE Console running on port ${CONFIG.port}`);
 
   // Auto-start primary session if configured
   const primaryId = process.env.PRIMARY_SESSION_ID || 'primary';
@@ -123,13 +123,15 @@ app.listen(CONFIG.port, async () => {
 });
 
 // Self-ping to keep alive on Render
-cron.schedule('*/10 * * * *', async () => {
+global.lastKeepAlivePulse = null;
+cron.schedule('*/5 * * * *', async () => {
+  if (!CONFIG.keepAlive || !CONFIG.renderUrl) return;
+
   try {
-    if (CONFIG.renderUrl) {
-      const url = CONFIG.renderUrl.endsWith('/') ? CONFIG.renderUrl : `${CONFIG.renderUrl}/`;
-      await axios.get(`${url}health`);
-      log.info('🔄 Factory Keep-alive successful');
-    }
+    const url = CONFIG.renderUrl.endsWith('/') ? CONFIG.renderUrl : `${CONFIG.renderUrl}/`;
+    await axios.get(`${url}health`, { timeout: 10000 });
+    global.lastKeepAlivePulse = Date.now();
+    log.info('🔄 Factory Keep-alive successful');
   } catch (error) {
     log.error('❌ Factory Keep-alive failed:', error.message);
   }

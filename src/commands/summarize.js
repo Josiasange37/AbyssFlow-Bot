@@ -8,12 +8,12 @@ module.exports = {
   description: 'Résume les dernières discussions du groupe.',
   execute: async ({ sock, chatId, message, bot }) => {
     try {
-      await bot.sendMessage(chatId, { text: "Je relis les discussions pour vous faire un topo... 📖✍️" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Analyse de Rapport*\nSynthèse des flux de communication en cours de traitement...` }, { quoted: message });
 
       const history = await Brain.getHistory(chatId);
 
       if (history.length < 5) {
-        return await bot.sendMessage(chatId, { text: "Pas assez de messages pour résumer pour le moment. 🌵" }, { quoted: message });
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Données Insuffisantes*\nLe volume de messages est trop faible pour générer un rapport cohérent.` }, { quoted: message });
       }
 
       // Prepare the context for the AI
@@ -34,9 +34,9 @@ module.exports = {
       if (summary) {
         // Remove AI metadata if any
         const cleanSummary = summary.replace(/\[MEMORY: .*?\]/g, '').trim();
-        await bot.sendMessage(chatId, { text: `📝 *RÉSUMÉ DU FLOW* 📝\n\n${cleanSummary}` }, { quoted: message });
+        await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Rapport de Synthèse Exécutive*\n\n${cleanSummary}` }, { quoted: message });
       } else {
-        await bot.sendMessage(chatId, { text: "Je n'ai pas pu générer le résumé. 😵‍💫" }, { quoted: message });
+        await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nÉchec de la génération du rapport.` }, { quoted: message });
       }
 
     } catch (error) {

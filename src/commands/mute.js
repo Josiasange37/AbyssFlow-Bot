@@ -12,7 +12,7 @@ module.exports = {
         message.message?.extendedTextMessage?.contextInfo?.participant;
 
       if (!mentioned) {
-        return await bot.sendMessage(chatId, { text: "Mentionne le fauteur de trouble pour le mute ! 🤫" }, { quoted: message });
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nVeuillez mentionner l'individu à suspendre.` }, { quoted: message });
       }
 
       // Simple mute implementation: Add to a local file/set
@@ -32,7 +32,7 @@ module.exports = {
       mutedList.add(mutedId);
 
       await bot.sendMessage(chatId, {
-        text: `🤫 *@${mutedId.split('@')[0]} est maintenant réduit au silence pour ${duration} minutes.* \n\nPsycho Bo va supprimer ses messages automatiquement. 🛡️⚔️`,
+        text: `* \`${bot.botName || 'Diane'}\` *\n\n*Sanction Disciplinaire*\nL'accès au chat pour @${mutedId.split('@')[0]} a été suspendu pour une durée de \`${duration}\` minutes.`,
         mentions: [mutedId]
       });
 

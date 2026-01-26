@@ -22,14 +22,14 @@ module.exports = {
       }
 
       if (!target) {
-        return await bot.sendSafeMessage(chatId, `❌ *Usage:* Mentionne un utilisateur, cite son message, ou utilise son numéro.\nExemple: \`${config.prefix}kick @user\``, { quotedMessage: message });
+        return await bot.sendSafeMessage(chatId, `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nUtilisez \`${config.prefix}kick @utilisateur\` pour lancer la procédure d'expulsion.`, { quotedMessage: message });
       }
 
       // 2. Protection owners (sans split pour gérer LID)
       const targetUser = target.split('@')[0].replace(/:/g, '');
       const isTargetOwner = config.owners.includes(targetUser);
       if (isTargetOwner) {
-        return await bot.sendSafeMessage(chatId, `🛡️ *PROTECTION:* Impossible de retirer ce membre.`);
+        return await bot.sendSafeMessage(chatId, `* \`${bot.botName || 'Diane'}\` *\n\n*Alerte de Sécurité*\nImpossible de procéder à l'expulsion de cette entité (Privilèges Supérieurs).`);
       }
 
       // 3. Normalisation JID robuste (gère LID et PN, supprime :0!)
@@ -40,7 +40,7 @@ module.exports = {
 
       // Vérification self-kick
       if (normalizedTarget === sender) {
-        return await bot.sendSafeMessage(chatId, `❌ *Erreur:* Impossible de s\'expulser soi-même.`);
+        return await bot.sendSafeMessage(chatId, `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur Protocolaire*\nL'auto-expulsion n'est pas autorisée par le système.`);
       }
 
       log.info(`[KICK] Tentative d\'expulsion ${normalizedTarget} de ${chatId} (bot admin: ${await bot.isBotGroupAdmin(chatId)})`);
@@ -62,7 +62,7 @@ module.exports = {
 
       if (success) {
         await bot.sendSafeMessage(chatId, {
-          text: `💀 *DÉCONNEXION FORCÉE:* @${targetUser} a été expulsé du périmètre sans restriction.`,
+          text: `* \`${bot.botName || 'Diane'}\` *\n\n*Procédure d'Expulsion*\nL'accès de @${targetUser} au groupe a été révoqué avec succès.`,
           mentions: [normalizedTarget]
         }, { quotedMessage: message });
       } else {

@@ -7,12 +7,12 @@ module.exports = {
   async execute({ chatId, args, bot, message }) {
     const url = args[0];
     if (!url) {
-      return await bot.sendMessage(chatId, { text: "❌ Tu n'as pas mis de lien, chef ! Utilisation: *.dl [lien]*" }, { quoted: message });
+      return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide au Téléchargement*\nVeuillez fournir une URL de source valide.` }, { quoted: message });
     }
 
     const handled = await LinkHandler.handle(bot, chatId, url, message);
     if (!handled) {
-      await bot.sendMessage(chatId, { text: "💀 Désolé , j'ai pas pu gérer ce lien. Vérifie qu'il est correct !" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Échec du Transfert*\nLe protocole de téléchargement n'a pas pu traiter cette source.` }, { quoted: message });
     }
   }
 };

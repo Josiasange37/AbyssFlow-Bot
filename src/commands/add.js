@@ -9,7 +9,7 @@ module.exports = {
   async execute({ sock, chatId, message, args, bot, config }) {
     try {
       if (args.length === 0) {
-        await bot.sendSafeMessage(chatId, `faut me donner le numéro . ex: ${config.prefix}add 33612345678`);
+        await bot.sendSafeMessage(chatId, `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nSpécifiez un identifiant numérique : \`${config.prefix}add [numéro]\`.`);
         return;
       }
 
@@ -18,13 +18,13 @@ module.exports = {
         .map(n => `${n}@s.whatsapp.net`);
 
       if (numbersToAdd.length === 0) {
-        await bot.sendSafeMessage(chatId, `tes numéros sont bizarres, vérifie stp.`);
+        await bot.sendSafeMessage(chatId, `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur de Données*\nLes identifiants fournis ne sont pas valides.`);
         return;
       }
 
       const isBotAdmin = await bot.isBotGroupAdmin(chatId);
       if (!isBotAdmin) {
-        await bot.sendSafeMessage(chatId, `je suis pas admin, je peux ajouter personne 🤷‍♂️`);
+        await bot.sendSafeMessage(chatId, `* \`${bot.botName || 'Diane'}\` *\n\n*Restriction*\nAccréditation insuffisante. Veuillez me promouvoir Admin.`);
         return;
       }
 
@@ -52,9 +52,9 @@ module.exports = {
       }
 
       if (added.length > 0) {
-        const addedList = added.map(jid => `• @${jid.split('@')[0]}`).join('\n');
+        const addedList = added.map(jid => `• \`${jid.split('@')[0]}\``).join('\n');
         await bot.sendMessage(chatId, {
-          text: `Bienvenue dans la mif! 👋\n${addedList}`,
+          text: `* \`${bot.botName || 'Diane'}\` *\n\n*Accès Autorisé*\nNouveaux membres intégrés :\n${addedList}`,
           mentions: added
         });
       }

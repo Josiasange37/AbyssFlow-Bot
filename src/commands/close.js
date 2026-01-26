@@ -8,7 +8,7 @@ module.exports = {
     try {
       await sock.groupSettingUpdate(chatId, 'announcement');
       await bot.sendMessage(chatId, {
-        text: `🔒 Silence radio.\nSeuls les admins peuvent parler.`,
+        text: `* \`${bot.botName || 'Diane'}\` *\n\n*Verrouillage Périmètre*\nLe canal de communication est désormais restreint aux autorités (Admins).`,
         quoted: message
       });
     } catch (error) {

@@ -8,15 +8,16 @@ module.exports = {
     const groupCount = Object.keys(chats).length;
 
     const stats = [
-      `📊 *Psycho Stats*`,
+      `* \`${config.botName || 'Diane'}\` *`,
       ``,
-      `⏱️ Uptime: ${uptime}`,
-      `👥 Groupes: ${groupCount}`,
-      `📩 Msgs reçus: ${bot.metrics.messagesProcessed}`,
-      `⚡ Commandes: ${bot.commandCount}`,
-      `🏓 Latence: ${Date.now() - bot.metrics.lastPingAt || 0}ms`,
+      `*Statistiques Système*`,
+      `• Disponibilité : \`${uptime}\``,
+      `• Unités (Groupes) : \`${groupCount}\``,
+      `• Flux de données : \`${bot.metrics.messagesProcessed} msgs\``,
+      `• Commandes traitées : \`${bot.commandCount}\``,
+      `• Latence réseau : \`${Date.now() - bot.metrics.lastPingAt || 0}ms\``,
       ``,
-      `🌊 _Water Hashira_`
+      `*Diagnostic effectué avec succès.*`
     ].join('\n');
 
     await bot.sendSafeMessage(chatId, stats, { quotedMessage: message });

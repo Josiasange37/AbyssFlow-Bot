@@ -11,7 +11,7 @@ module.exports = {
       const participants = metadata.participants;
       const total = participants.length;
 
-      await bot.sendMessage(chatId, { text: "🔍 Analyse de l'activité en cours... Ça peut prendre un moment . ⏳" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Audit d'Activité*\nAnalyse des flux de données en cours. Veuillez patienter...` }, { quoted: message });
 
       const stats = await UserStats.find({ groupId: chatId });
       const activeIds = stats.filter(s => s.messagesCount > 0).map(s => s.userId);
@@ -22,11 +22,10 @@ module.exports = {
       const ghosts = participants.filter(p => !activeIds.includes(p.id) && p.id !== botId);
 
       if (ghosts.length === 0) {
-        return await bot.sendMessage(chatId, { text: "🚀 Incroyable ! Tout le monde est actif dans ce groupe. Aucun fantôme détecté. 🤙🔥" }, { quoted: message });
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Rapport d'Audit*\nAucune entité inactive détectée. Le groupe maintient un niveau d'engagement optimal.` }, { quoted: message });
       }
 
-      let ghostList = `👻 *LISTE DES FANTÔMES (${ghosts.length})* 👻\n\n`;
-      ghostList += `_Ces membres n'ont jamais parlé depuis que je suis là (ou ont 0 XP)._\n\n`;
+      let ghostList = `* \`${bot.botName || 'Diane'}\` *\n\n*Identification des Inactifs (${ghosts.length})*\n_Entités n'ayant aucune interaction enregistrée :_\n\n`;
 
       const mentions = [];
       ghosts.slice(0, 50).forEach((g, i) => { // Limit to 50 for large groups
@@ -37,7 +36,7 @@ module.exports = {
 
       if (ghosts.length > 50) ghostList += `\n... et ${ghosts.length - 50} autres.`;
 
-      ghostList += `\n\n💡 _Utilise ton admin power pour faire le ménage ! 🧹_`;
+      ghostList += `\n\n💡 *Action recommandée :* Procéder au nettoyage administratif si nécessaire.`;
 
       await bot.sendMessage(chatId, {
         text: ghostList,

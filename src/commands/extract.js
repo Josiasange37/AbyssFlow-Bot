@@ -16,7 +16,7 @@ module.exports = {
             const reply = async (text) => await sock.sendMessage(remoteJid, { text }, { quoted: message });
 
             if (!quotedMsg) {
-                return reply("❌ Répondez à un message View Once (photo/vidéo) avec !extract");
+                return reply(`* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nVeuillez répondre à un contenu éphémère avec \`${bot.config?.prefix || '*'}extract\`.`);
             }
 
             // Unpack nested structures (Ephemeral -> ViewOnce -> Message)
@@ -36,8 +36,8 @@ module.exports = {
 
             const mediaData = content[`${mediaType}Message`];
             if (!mediaData || !mediaData.mediaKey) {
-                console.error(`[EXTRACT] Media key missing. Message might be undecryptable.`);
-                return reply("❌ Impossible de lire le média (Erreur de décryptage).\n\n💡 *Solution:* Utilisez la commande *!logout* et rescannez le QR code pour synchroniser votre session.");
+                console.error(`[EXTRACT] Media key missing.`);
+                return reply(`* \`${bot.botName || 'Diane'}\` *\n\n*Erreur de Traitement*\nImpossible de décrypter le flux binaire. La session de synchronisation a peut-être expiré.`);
             }
 
             console.log(`[EXTRACT] Unpacking ${mediaType} for extraction...`);

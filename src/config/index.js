@@ -6,6 +6,8 @@ const CONFIG = {
     ? process.env.BOT_OWNERS.split(',').map((v) => v.trim()).filter(Boolean)
     : [],
   prefix: process.env.BOT_PREFIX?.trim() || '*',
+  keepAlive: process.env.KEEP_ALIVE === 'true',
+  renderUrl: process.env.RENDER_URL || '',
   sessionPath: process.env.SESSION_PATH || './session',
   maxCommandsPerMinute: Number(process.env.MAX_COMMANDS_PER_MINUTE) || 12,
   minDelay: Number(process.env.RESPONSE_DELAY_MIN_MS) || 250,

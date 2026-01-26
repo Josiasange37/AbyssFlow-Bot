@@ -14,14 +14,16 @@ module.exports = {
       const isAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin');
 
       const statusMsg = [
-        `*🤖 Mon Status Ici*`,
+        `* \`${bot.botName || 'Diane'}\` *`,
         ``,
-        `Membres: ${totalMembers}`,
-        `Admins: ${admins.length}`,
+        `*État d'Accréditation*`,
+        `Localisation : \`${groupMetadata.subject}\``,
+        `Membres détectés : \`${totalMembers}\``,
+        `Autorités (Admins) : \`${admins.length}\``,
         ``,
-        isAdmin ? `✅ Je suis Admin (tranquille)` : `❌ Je suis pas Admin (mettre moi admin svp)`,
+        isAdmin ? `\`ACCRÉDITATION: ADMIN ✅\`` : `\`ACCRÉDITATION: LIMITÉE ❌\``,
         ``,
-        isAdmin ? `Je peux gérer le groupe 😎` : `Je peux rien faire sans les droits 😴`
+        isAdmin ? `Interface de gestion opérationnelle.` : `Droit d'administration requis pour les fonctions avancées.`
       ].join('\n');
 
       await bot.sendSafeMessage(chatId, statusMsg);

@@ -9,7 +9,14 @@ module.exports = {
 
     bot.metrics.lastPingAt = now;
 
-    const response = `🖥️ *SYSTEM STATUS*\n\n📡 Latency: ${latency}ms\n⏱️ Uptime: ${bot.formatDuration(uptime)}\n✅ Status: OPERATIONAL`;
+    const response = [
+      `* \`${bot.botName || 'Diane'}\` *`,
+      ``,
+      `*Statut de Connectivité*`,
+      `• Latence : \`${latency}ms\``,
+      `• Session : \`${bot.formatDuration(uptime)}\``,
+      `• État : \`OPÉRATIONNEL\``
+    ].join('\n');
     await bot.sendMessage(chatId, { text: response }, { quoted: message });
   }
 };

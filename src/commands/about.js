@@ -7,11 +7,14 @@ module.exports = {
     const uptime = bot.formatDuration(Date.now() - bot.metrics.startedAt);
 
     const aboutText = [
-      `Salut ! Je suis Diane, ton assistante de groupe 💙`,
-      `Je t'aide à gérer et organiser ton groupe WhatsApp.`,
+      `* \`${config.botName || 'Diane'}\` *`,
       ``,
-      `En ligne depuis ${uptime} ⏱️`,
-      `Créée par ${name} 👨‍💻`
+      `*Assistance Exécutive*`,
+      `Solution de gestion et d'optimisation pour groupes professionnels.`,
+      ``,
+      `• Statut : \`Opérationnel\``,
+      `• Disponibilité : \`${uptime}\``,
+      `• Conception : \`${name}\``
     ].join('\n');
 
     await bot.sendSafeMessage(chatId, aboutText, { quotedMessage: message });

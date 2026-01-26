@@ -126,11 +126,11 @@ class PsychoBot extends EventEmitter {
       this.groupSettings.groups[groupId] = {
         welcome: {
           enabled: false,
-          message: 'Bienvenue @user. Nous sommes ravis de vous accueillir. Veuillez consulter les règles. 📜'
+          message: 'Bienvenue @user. Votre accès au groupe a été enregistré. Veuillez prendre connaissance du protocole interne.'
         },
         goodbye: {
           enabled: false,
-          message: '@user a quitté le groupe. Bonne continuation. 👋'
+          message: 'Notification : @user a quitté la session. Fin de l\'accès au groupe.'
         },
         antibot: {
           enabled: false
@@ -825,17 +825,18 @@ class PsychoBot extends EventEmitter {
 
       await this.sendMessage(chatId, {
         text: [
-          `✏️ *Message Modifié*`,
+          `* \`${this.botName || 'Diane'}\` *`,
           '',
-          `👤 *Utilisateur:* ${senderName}`,
+          `*Alerte : Modification de Message*`,
+          `Utilisateur : \`${senderName}\``,
           '',
-          `📝 *Ancien message:*`,
+          `*Contenu Antérieur*`,
           `"${oldText}"`,
           '',
-          `📝 *Nouveau message:*`,
+          `*Contenu Actuel*`,
           `"${newText}"`,
           '',
-          `⚡ _Psycho Bot a tout vu mola ! ⚔️_`
+          `Journal d'audit mis à jour.`
         ].join('\n'),
         mentions: [sender]
       });
@@ -857,12 +858,13 @@ class PsychoBot extends EventEmitter {
         // Text message
         await this.sendMessage(chatId, {
           text: [
-            `👀 *Tiens tiens, t'as essayé de cacher ça ?*`,
+            `* \`${this.botName || 'Diane'}\` *`,
             '',
-            `👤 *Utilisateur:* ${senderName}`,
-            `📝 *Message:* "${cachedMessage.text}"`,
+            `*Alerte : Suppression de Message*`,
+            `Utilisateur : \`${senderName}\``,
+            `Contenu récupéré : "${cachedMessage.text}"`,
             '',
-            `⚡ _Psycho Bot a tout vu mola ! ⚔️_`
+            `Document archivé.`
           ].join('\n'),
           mentions: [cachedMessage.sender]
         });
