@@ -333,6 +333,12 @@ class PsychoBot extends EventEmitter {
 
       log.warn(`Connection closed (code ${statusCode || 'unknown'})`);
 
+      // --- CONFLICT RESOLUTION PROTOCOL (Code 440) ---
+      if (statusCode === 440 || statusCode === 503) {
+        log.error(`[CONFLICT] Multiple instances detected. Backing off for 60 seconds.`);
+        this.reconnectDelay = 60000; // Force 1 minute wait
+      }
+
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
 
       if (shouldReconnect) {
