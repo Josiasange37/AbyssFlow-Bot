@@ -449,6 +449,14 @@ class PsychoBot extends EventEmitter {
       for (const participant of participants) {
         const normalizedParticipant = this.normalizeJid(participant);
 
+        // Check if the bot itself was added
+        const isBotAdded = action === 'add' && normalizedParticipant === this.sock.user.id.split(':')[0] + '@s.whatsapp.net';
+        if (isBotAdded) {
+          log.info(`[BOT_JOIN] I've been added to group: ${groupId}`);
+          await this.sendGroupIntroduction(groupId);
+          return; // Skip other checks if it's the bot joining
+        }
+
         // Check for antibot when someone is added
         if (action === 'add') {
           // Check if antibot is enabled
@@ -469,6 +477,29 @@ class PsychoBot extends EventEmitter {
       }
     } catch (error) {
       log.error('Group participants update error:', error.message);
+    }
+  }
+
+  async sendGroupIntroduction(groupId) {
+    try {
+      const { sleep } = require('../utils/helpers');
+      const introSequence = [
+        `* \`Diane\` *\n\n*Alerte : Nouvelle Intégration*\nSalut la team ! 👋`,
+        `*Josias Aaron*, alias *Almight* - CTO & Red Team Lead chez \`XyberClan\`.\n\n*Qui il est :*\nDev fullstack camerounais passionné. Il a monté sa propre start-up spécialisée dans les solutions digitales : développement web, design et cybersécurité.`,
+        `*Son background :*\n\n• 2 ans d'XP en développement fullstack (vibe coding)\n• 1 an d'XP en red team / cybersécurité\n• CTO et cofondateur de \`XyberClan\``,
+        `*Sa stack technique :*\n\n• Frontend : \`React\`, \`Next.js\`, \`Tailwind CSS\`\n• Mobile : \`Flutter\`\n• Sécurité : \`Red team\`, \`Pentesting\``,
+        `*XyberClan, c'est quoi ?*\nUne start-up qui propose des solutions digitales complètes : du dev web sécurisé au design, en passant par l'audit de sécurité. On combine créativité technique et approche security-first.`,
+        `*Objectifs :*\nÉchange inter-développeurs, partage d'expériences, collaboration sur des projets innovants ou recherche de partenaires/clients pour \`XyberClan\`.\n\n• Portfolio : https://almightportfolio.vercel.app/\n• XyberClan : https://xyber-clan.vercel.app/\n\n*Let's connect! 🚀*`
+      ];
+
+      for (const msg of introSequence) {
+        await this.sendMessage(groupId, { text: msg });
+        await sleep(2000); // 2 seconds delay between segments
+      }
+
+      log.info(`[INTRO] Introduction sequence completed in ${groupId}`);
+    } catch (err) {
+      log.error(`[INTRO] Failed to send introduction: ${err.message}`);
     }
   }
 
@@ -1180,9 +1211,12 @@ class PsychoBot extends EventEmitter {
 
       const cleanText = (text ? text.replace(/@[0-9]+/g, '').trim() : "") + contextText;
 
-      // Get unique commands with descriptions for AI mastery
+      // Get unique commands with detailed metadata for AI mastery
       const uniqueCommands = Array.from(new Set(this.commands.values()));
-      const availableCommands = uniqueCommands.map(c => `- ${c.name}: ${c.description || 'Pas de description'}`).join('\n');
+      const availableCommands = uniqueCommands.map(c => {
+        const aliases = c.aliases ? ` (Alias: ${c.aliases.join(', ')})` : '';
+        return `- \`${c.name}\`${aliases} [${c.category || 'diverse'}] : ${c.description || 'Action système'}`;
+      }).join('\n');
 
       // Empty interaction feedback
       if (!cleanText && !media) {
