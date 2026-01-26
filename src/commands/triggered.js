@@ -5,7 +5,7 @@ const axios = require('axios');
 module.exports = {
   name: 'triggered',
   aliases: ['tg', 'trigger'],
-  description: 'Apply a triggered effect to a profile picture or image',
+  description: 'Apply a triggered effect to an image',
   async execute({ chatId, message, bot, sender }) {
     try {
       const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -16,22 +16,20 @@ module.exports = {
       } else if (message.message?.imageMessage) {
         targetImage = await bot.downloadMedia(message.message.imageMessage, 'image');
       } else {
-        // If no image, use the sender's (or target's) PFP
         const target = sender;
         try {
           const ppUrl = await bot.sock.profilePictureUrl(target, 'image');
           const response = await axios.get(ppUrl, { responseType: 'arraybuffer' });
           targetImage = Buffer.from(response.data);
         } catch (e) {
-          return await bot.sendMessage(chatId, { text: "Envoie une image ou réponds à une pour que je la trigger ! 💢" }, { quoted: message });
+          return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nVeuillez fournir une image pour activer le mode Surcharge.` }, { quoted: message });
         }
       }
 
-      await bot.sendMessage(chatId, { text: "💢 *TRIGGERING INTENSIFIES*... 💢" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Alerte de Surcharge*\nActivation des filtres de saturation critiques...` }, { quoted: message });
 
       const info = await sharp(targetImage).metadata();
 
-      // Create the triggered overlay
       const svgOverlay = Buffer.from(`
         <svg width="${info.width}" height="${info.height}">
           <rect width="100%" height="100%" fill="rgba(255,0,0,0.4)"/>
@@ -48,12 +46,12 @@ module.exports = {
 
       await bot.sendMessage(chatId, {
         image: result,
-        caption: `CHILL ! 😂💢`
+        caption: `* \`${bot.botName || 'Diane'}\` *\n\n*État de Surcharge Confirmé*`
       }, { quoted: message });
 
     } catch (error) {
       log.error('Trigger command failed:', error.message);
-      await bot.sendMessage(chatId, { text: "Impossible de trigger ça... 🛠️" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nÉchec du l'activation des filtres de surcharge.` }, { quoted: message });
     }
   }
 };

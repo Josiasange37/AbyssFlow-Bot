@@ -10,7 +10,7 @@ module.exports = {
       const stats = await UserStats.findOne({ userId: sender, groupId: chatId });
 
       if (!stats) {
-        return await bot.sendMessage(chatId, { text: "Tu n'as pas encore de stats , continue à parler ! 🗣️" }, { quoted: message });
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Alerte*\nAucune donnée enregistrée pour cette entité. Veuillez augmenter votre taux d'interaction.` }, { quoted: message });
       }
 
       const xpNeeded = stats.level * 100;
@@ -20,17 +20,18 @@ module.exports = {
       const userTag = `@${sender.split('@')[0]}`;
 
       const rankText = [
-        `🏆 *PROFIL PSYCHO ELITE* 🏆`,
+        `* \`${bot.botName || 'Diane'}\` *`,
         ``,
-        `👤 *Utilisateur:* ${userTag}`,
-        `⭐ *Niveau:* ${stats.level}`,
-        `📈 *XP:* ${stats.xp} / ${xpNeeded}`,
-        `💬 *Messages:* ${stats.messagesCount}`,
+        `*FICHE D'IDENTIFICATION OPÉRATIVE*`,
+        `Entité : \`${userTag}\``,
+        `Crédibilité (Level) : \`${stats.level}\``,
+        `Expérience (XP) : \`${stats.xp} / ${xpNeeded}\``,
+        `Volume d'Interactions : \`${stats.messagesCount}\``,
         ``,
-        `*Progression:*`,
-        `${progressBar} ${Math.floor((stats.xp / xpNeeded) * 100)}%`,
+        `*Progression de Carrière :*`,
+        `|${progressBar}| ${Math.floor((stats.xp / xpNeeded) * 100)}%`,
         ``,
-        `💪 Continue comme ça !`
+        `Maintenez un niveau d'engagement élevé.`
       ].join('\n');
 
       await bot.sendMessage(chatId, {
@@ -40,7 +41,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Rank command error:', error);
-      await bot.sendMessage(chatId, { text: "Impossible de récupérer tes stats pour le moment... 🛠️" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nImpossible d'accéder aux registres de productivité pour le moment.` }, { quoted: message });
     }
   }
 };

@@ -5,27 +5,20 @@ module.exports = {
   description: 'Show your account information',
   async execute({ chatId, message, bot, sender, isOwner, isGroup, isGroupAdmin, canUseAdminCommands }) {
     const whoamiMsg = [
-      `*🔍 Informations de Votre Compte*`,
+      `* \`${bot.botName || 'Diane'}\` *`,
       '',
-      `📱 *Votre JID:*`,
-      `\`${sender}\``,
+      `*RAPPORT D'IDENTITÉ OPÉRATIVE*`,
+      `Identifiant JID : \`${sender}\``,
+      `Référence Normalisée : \`${normalizeNumber(sender)}\``,
       '',
-      `🔢 *Numéro Normalisé:*`,
-      `\`${normalizeNumber(sender)}\``,
+      `*AUTORISATIONS & PRIVILÈGES*`,
+      `• Rang de Propriétaire : ${isOwner ? '`AUTORISÉ ✅`' : '`RESTREINT ❌`'}`,
+      `• Autorité de Groupe : ${isGroup && isGroupAdmin ? '`ADMIN ✅`' : (isGroup ? '`MEMBRE ❌`' : '`N/A`')}`,
+      `• Interface Administrative : ${canUseAdminCommands ? '`ACTIVÉE ✅`' : '`DÉSACTIVÉE ❌`'}`,
       '',
-      `🔐 *Permissions:*`,
-      `• Propriétaire: ${isOwner ? '✅' : '❌'}`,
-      `• Admin du groupe: ${isGroup && isGroupAdmin ? '✅' : (isGroup ? '❌' : 'N/A')}`,
-      `• Peut utiliser commandes admin: ${canUseAdminCommands ? '✅' : '❌'}`,
-      '',
-      `💡 *Utilisez cette info pour le debug*`
+      `Rapport généré pour audit technique.`
     ].join('\n');
 
-    await bot.sendSafeMessage(chatId, whoamiMsg, {
-      isCommandResponse: true,
-      title: 'WHO AM I',
-      type: 'info',
-      quotedMessage: message
-    });
+    await bot.sendMessage(chatId, { text: whoamiMsg }, { quoted: message });
   }
 };

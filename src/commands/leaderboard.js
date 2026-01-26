@@ -7,26 +7,24 @@ module.exports = {
   isGroupOnly: true,
   async execute({ chatId, bot, message }) {
     try {
-      // Get top 10 users by level then xp
       const topUsers = await UserStats.find({ groupId: chatId })
         .sort({ level: -1, xp: -1 })
         .limit(10);
 
       if (!topUsers || topUsers.length === 0) {
-        return await bot.sendMessage(chatId, { text: "Aucune donnée disponible pour le moment... 🤷‍♂️" }, { quoted: message });
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Alerte*\nAucune donnée d'interaction disponible dans les registres.` }, { quoted: message });
       }
 
-      let lbText = `📊 *LEADERBOARD PSYCHO FLOW* 📊\n\n`;
+      let lbText = `* \`${bot.botName || 'Diane'}\` *\n\n*REGISTRE DE PRODUCTIVITÉ OPÉRATIVE*\n\n`;
       const mentions = [];
 
       topUsers.forEach((user, index) => {
-        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '👤';
         const userTag = `@${user.userId.split('@')[0]}`;
         mentions.push(user.userId);
-        lbText += `${medal} ${index + 1}. ${userTag}\n  ╰ Niv. ${user.level} | ${user.messagesCount} msgs\n\n`;
+        lbText += `[\`${index + 1}\`] • ${userTag}\n  ╰ Grade : \`${user.level}\` | Interactions : \`${user.messagesCount}\`\n\n`;
       });
 
-      lbText += `🔥 *XyberClan Elite Force* ⚔️`;
+      lbText += `*Données archivées avec succès.*`;
 
       await bot.sendMessage(chatId, {
         text: lbText,
@@ -35,7 +33,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Leaderboard command error:', error);
-      await bot.sendMessage(chatId, { text: "Erreur lors de la récupération du classement... 🛠️" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nAccès au registre de productivité restreint.` }, { quoted: message });
     }
   }
 };

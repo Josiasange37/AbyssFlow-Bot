@@ -4,7 +4,7 @@ const { log } = require('../utils/logger');
 module.exports = {
     name: 'selfie',
     aliases: ['botpic', 'portrait'],
-    description: 'Generate a consistent AI selfie of Psycho Bot',
+    description: 'Generate a consistent AI selfie of Diane',
     async execute({ chatId, args, bot, message }) {
         try {
             const scenarios = [
@@ -21,7 +21,7 @@ module.exports = {
             const userScenario = args.join(' ');
             const scenario = userScenario || scenarios[Math.floor(Math.random() * scenarios.length)];
 
-            await bot.sendMessage(chatId, { text: "📸 Un instant... Je prépare mon meilleur profil. ✨" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Capture Identitaire*\nSynchronisation des couches visuelles en cours...` }, { quoted: message });
 
             const prompt = Persona.getBotVisualPrompt(scenario);
             const seed = Math.floor(Math.random() * 1000000);
@@ -29,12 +29,12 @@ module.exports = {
 
             await bot.sendMessage(chatId, {
                 image: { url: imageUrl },
-                caption: `📸 *PSYCHO-SELFIE* 🦾✨\n\n📌 *Scenario:* ${scenario}\n⚡ _Identité Xyber-Élite_`
+                caption: `* \`${bot.botName || 'Diane'}\` *\n\n*Portrait Réglementaire*\nScénario : \`${scenario}\``
             }, { quoted: message });
 
         } catch (error) {
             log.error('Selfie command failed:', error.message);
-            await bot.sendMessage(chatId, { text: "Impossible de générer le selfie pour le moment... 🛠️" }, { quoted: message });
+            await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nImpossible de finaliser la capture visuelle.` }, { quoted: message });
         }
     }
 };

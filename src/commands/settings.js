@@ -14,50 +14,44 @@ module.exports = {
         settings = await GroupSettings.create({ groupId: chatId });
       }
 
-      // If an argument is provided, toggle the setting
       const toggle = args[0]?.toLowerCase();
       const validToggles = ['welcome', 'antidelete', 'automod', 'chatbot'];
 
       if (toggle && validToggles.includes(toggle)) {
-        // Map 'antidelete' to 'antiDelete'
         const key = toggle === 'antidelete' ? 'antiDelete' : toggle === 'automod' ? 'autoMod' : toggle;
         settings[key] = !settings[key];
         await settings.save();
 
         return await bot.sendMessage(chatId, {
-          text: `✅ *Réglage mis à jour !*\n\n⚙️ *${toggle.toUpperCase()}:* ${settings[key] ? 'ACTIVÉ 🟢' : 'DÉSACTIVÉ 🔴'}\n\n_Le clan s'adapte à ton flow, ._ 🤙⚡`
+          text: `* \`${bot.botName || 'Diane'}\` *\n\n*MISE À JOUR DES PARAMÈTRES*\nParamètre \`${toggle.toUpperCase()}\` : ${settings[key] ? 'ACTIF ✅' : 'INACTIF ❌'}\n\nConfiguration enregistrée avec succès.`
         }, { quoted: message });
       }
 
-      // Otherwise, show the stylized menu
       const menu = [
-        `🛠️ *XYBER-CONTROL PANEL* 🛠️`,
-        `_Gère ton clan avec style ._`,
+        `* \`${bot.botName || 'Diane'}\` *`,
         ``,
-        `🟢 = Activé | 🔴 = Désactivé`,
+        `*PANNEAU DE CONFIGURATION DE L'UNITÉ*`,
         ``,
-        `👋 *Welcome:* ${settings.welcome ? '🟢' : '🔴'}`,
-        `  ╰ _*settings welcome_`,
+        `👋 Welcome : ${settings.welcome ? '`ACTIF ✅`' : '`INACTIF ❌`'}`,
+        `   Commande : \`*settings welcome\``,
         ``,
-        `🗑️ *Anti-Delete:* ${settings.antiDelete ? '🟢' : '🔴'}`,
-        `  ╰ _*settings antidelete_`,
+        `🗑️ Anti-Delete : ${settings.antiDelete ? '`ACTIF ✅`' : '`INACTIF ❌`'}`,
+        `   Commande : \`*settings antidelete\``,
         ``,
-        `🛡️ *Auto-Mod:* ${settings.autoMod ? '🟢' : '🔴'}`,
-        `  ╰ _*settings automod_`,
+        `🛡️ Auto-Mod : ${settings.autoMod ? '`ACTIF ✅`' : '`INACTIF ❌`'}`,
+        `   Commande : \`*settings automod\``,
         ``,
-        `🧠 *AI Chatbot:* ${settings.chatbot ? '🟢' : '🔴'}`,
-        `  ╰ _*settings chatbot_`,
+        `🧠 AI Chatbot : ${settings.chatbot ? '`ACTIF ✅`' : '`INACTIF ❌`'}`,
+        `   Commande : \`*settings chatbot\``,
         ``,
-        `💡 *Astuce:* Tape une commande pour switcher.`,
-        ``,
-        `⚡ *Flow Psycho Bo * ⚔️`
+        `Veuillez utiliser les commandes indiquées pour modifier les protocoles.`
       ].join('\n');
 
       await bot.sendMessage(chatId, { text: menu }, { quoted: message });
 
     } catch (error) {
       log.error('Settings command failed:', error.message);
-      await bot.sendMessage(chatId, { text: "Impossible d'ouvrir le panneau de contrôle... 🛠️" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nÉchec de l'accès au panneau de configuration.` }, { quoted: message });
     }
   }
 };

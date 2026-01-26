@@ -4,14 +4,16 @@ module.exports = {
   description: 'Bot legal disclaimer',
   async execute({ chatId, bot }) {
     const text = [
-      `*⚖️ Clause de Non-Responsabilité*`,
+      `* \`${bot.botName || 'Diane'}\` *`,
       ``,
-      `Je suis un bot indépendant.`,
-      `Je ne suis pas responsable de ce que tu fais avec.`,
-      `Utilise moi sagement pour pas te faire bannir!`,
+      `*CLAUSE DE NON-RESPONSABILITÉ*`,
       ``,
-      `🌊 _Water Hashira_`
+      `• Entité : Diane opère en tant qu'assistante exécutive indépendante.`,
+      `• Responsabilité : L'utilisateur final assume l'entière responsabilité des interactions effectuées.`,
+      `• Conformité : Veillez à respecter les conditions générales du fournisseur de service tiers.`,
+      ``,
+      `Système opérationnel sous licence standard.`
     ].join('\n');
-    await bot.sendSafeMessage(chatId, text);
+    await bot.sendMessage(chatId, { text });
   }
 };

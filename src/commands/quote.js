@@ -1,24 +1,23 @@
+const axios = require('axios');
 const { log } = require('../utils/logger');
-const sharp = require('sharp');
 
 module.exports = {
   name: 'quote',
   aliases: ['qc', 'quotly'],
-  description: 'Transform a message into a beautiful quote card',
+  description: 'Transform a message into a professional quote card',
   async execute({ chatId, message, bot }) {
     try {
       const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
       if (!quoted) {
-        return await bot.sendMessage(chatId, { text: "Faut répondre à un message avec la commande pour le quote ! ✍️" }, { quoted: message });
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nRépondez à un message avec \`${bot.config?.prefix || '*'}quote\` pour archiver la citation.` }, { quoted: message });
       }
 
       const text = quoted.conversation || quoted.extendedTextMessage?.text || "[Média]";
       const sender = message.message?.extendedTextMessage?.contextInfo?.participant;
       const senderName = message.pushName || sender.split('@')[0];
 
-      await bot.sendMessage(chatId, { text: "⏳ Je prépare ton chef-d'œuvre... 🎨" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Mise en Page*\nGénération de l'archive visuelle en cours...` }, { quoted: message });
 
-      // Fetch profile pic
       let ppUrl;
       try {
         ppUrl = await bot.sock.profilePictureUrl(sender, 'image');
@@ -26,10 +25,6 @@ module.exports = {
         ppUrl = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(senderName) + '&background=random&color=fff&size=128';
       }
 
-      // For simplicity and speed in this environment, we'll use a public Quoter API 
-      // if possible, otherwise we fallback to a styled text message or SVG generation.
-      // Using a well-known public API for this (Quotly style)
-      const axios = require('axios');
       const quoteData = {
         "type": "quote",
         "format": "png",
@@ -59,12 +54,12 @@ module.exports = {
 
       await bot.sendMessage(chatId, {
         image: buffer,
-        caption: `Flow Psycho Quote 🤙✨`
+        caption: `* \`${bot.botName || 'Diane'}\` *\n\n*Répertoire des Citations*`
       }, { quoted: message });
 
     } catch (error) {
       log.error('Quote command failed:', error.message);
-      await bot.sendMessage(chatId, { text: "Impossible de générer le quote... 🛠️" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nImpossible de générer l'archive visuelle.` }, { quoted: message });
     }
   }
 };

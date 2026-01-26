@@ -4,15 +4,17 @@ module.exports = {
   description: 'Privacy policy of the bot',
   async execute({ chatId, bot }) {
     const text = [
-      `*🛡️ Politique de Confidentialité*`,
+      `* \`${bot.botName || 'Diane'}\` *`,
       ``,
-      `1. On garde pas tes messages sur serveur.`,
-      `2. Tes données restent sur ton WhatsApp.`,
-      `3. Le bot process tes commandes localement.`,
+      `*POLITIQUE DE PROTECTION DES DONNÉES*`,
       ``,
-      `Check le code si t'as un doute:`,
+      `• Stockage : Aucune archive de communication n'est conservée sur nos serveurs.`,
+      `• Localisation : Le traitement des données est opéré dans l'environnement local du terminal.`,
+      `• Transparence : L'architecture du système est consultable en libre accès.`,
+      ``,
+      `Référence technique :`,
       `https://github.com/Josiasange37/AbyssFlow-Bot`
     ].join('\n');
-    await bot.sendSafeMessage(chatId, text);
+    await bot.sendMessage(chatId, { text });
   }
 };

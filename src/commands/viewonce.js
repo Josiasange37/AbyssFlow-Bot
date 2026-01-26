@@ -6,7 +6,7 @@ module.exports = {
     try {
       const quoted = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
       if (!quoted) {
-        return await bot.sendSafeMessage(chatId, `faut répondre à une vue unique avec la commande .`);
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nRépondez à un message à vue unique.` });
       }
 
       let viewOnce = quoted.viewOnceMessage || quoted.viewOnceMessageV2 || quoted.viewOnceMessageV2Extension
@@ -14,18 +14,18 @@ module.exports = {
         || quoted.ephemeralMessage?.message?.viewOnceMessageV2;
 
       if (!viewOnce) {
-        return await bot.sendSafeMessage(chatId, `c'est pas une vue unique ça .`);
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nContenu non volatile détecté.` });
       }
 
       const content = viewOnce.message;
       const mediaType = content.imageMessage ? 'image' : content.videoMessage ? 'video' : content.audioMessage ? 'audio' : null;
 
       if (!mediaType) {
-        return await bot.sendSafeMessage(chatId, `format chelou, j'arrive pas à lire.`);
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nFormat binaire non identifié.` });
       }
 
       const sender = message.message.extendedTextMessage.contextInfo.participant || '';
-      const caption = `Tu pensais cacher quoi? 👀\nDe: @${sender.split('@')[0]}`;
+      const caption = `* \`${bot.botName || 'Diane'}\` *\n\n*Révélation de Données*\nOrigine : @${sender.split('@')[0]}\nNature : \`${mediaType.toUpperCase()}\``;
 
       let msgContent = {};
       if (mediaType === 'image') msgContent = { image: content.imageMessage.url ? { url: content.imageMessage.url } : content.imageMessage, caption };
@@ -37,7 +37,7 @@ module.exports = {
       await bot.sendMessage(chatId, msgContent, { quoted: message });
 
     } catch (error) {
-      await bot.sendSafeMessage(chatId, `oups, le message s'est autodétruit avant que je le chope.`);
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nLe contenu s'est désintégré avant interception.` });
     }
   }
 };

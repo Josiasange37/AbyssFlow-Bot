@@ -6,14 +6,13 @@ module.exports = {
     category: 'tools',
     async execute({ sock, chatId, args, message, bot }) {
         if (!args.length) {
-            return await bot.sendMessage(chatId, { text: '❌ *Usage:* `*say Votre texte ici`' }, { quoted: message });
+            return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nSpécifiez le contenu textuel : \`${bot.config?.prefix || '*'}say [texte]\`.` }, { quoted: message });
         }
 
         const text = args.join(' ');
 
-        // Limit length to avoid abuse
         if (text.length > 500) {
-            return await bot.sendMessage(chatId, { text: '❌ Texte trop long (max 500 caractères).' }, { quoted: message });
+            return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Alerte*\nContenu textuel trop volumineux (Max 500 octets).` }, { quoted: message });
         }
 
         await sock.sendPresenceUpdate('recording', chatId);
@@ -25,14 +24,14 @@ module.exports = {
                 await bot.sendMessage(chatId, {
                     audio: { url: audioPath },
                     mimetype: 'audio/mpeg',
-                    ptt: true // Send as voice note
+                    ptt: true
                 }, { quoted: message });
             } else {
-                await bot.sendMessage(chatId, { text: '❌ Erreur de génération audio.' }, { quoted: message });
+                await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nLe système de synthèse vocale ne répond pas.` }, { quoted: message });
             }
         } catch (error) {
             console.error('Say command error:', error);
-            await bot.sendMessage(chatId, { text: '❌ Une erreur est survenue.' }, { quoted: message });
+            await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Interruption*\nUne erreur technique a suspendu la génération audio.` }, { quoted: message });
         }
     }
 };

@@ -9,18 +9,23 @@ module.exports = {
       const groupName = groupMetadata.subject || 'Groupe';
       const participants = groupMetadata.participants;
       const admins = participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin');
-      const creationDate = groupMetadata.creation ? new Date(groupMetadata.creation * 1000).toLocaleDateString('fr-FR') : 'Jsp';
+      const creationDate = groupMetadata.creation ? new Date(groupMetadata.creation * 1000).toLocaleDateString('fr-FR') : 'Non répertoriée';
 
       const info = [
-        `*📱 ${groupName}*`,
-        `📅 Créé le: ${creationDate}`,
-        `👥 Membres: ${participants.length}`,
-        `👑 Admins (${admins.length}):`,
+        `* \`${bot.botName || 'Diane'}\` *`,
+        ``,
+        `*RAPPORT D' UNITÉ (GROUPE)*`,
+        `Dénomination : \`${groupName}\``,
+        `Identification : \`${chatId}\``,
+        `Date de Création : \`${creationDate}\``,
+        `Population : \`${participants.length} entités\``,
+        ``,
+        `*Autorités (Admins) :*`,
         admins.map(a => `• @${a.id.split('@')[0]}`).join('\n'),
         '',
-        `Desc: ${groupMetadata.desc || 'Pas de desc'}`,
+        `Description du périmètre : ${groupMetadata.desc || 'Aucune description disponible.'}`,
         '',
-        `Infos par Psycho Bot 🤖`
+        `Document généré par l'assistance exécutive.`
       ].join('\n');
 
       let pic = null;
@@ -33,7 +38,7 @@ module.exports = {
       }
 
     } catch (error) {
-      await bot.sendSafeMessage(chatId, `pas réussi à choper les infos :/`);
+      await bot.sendSafeMessage(chatId, `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nImpossible d'extraire les métadonnées de l'unité.`);
     }
   }
 };

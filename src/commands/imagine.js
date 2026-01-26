@@ -9,31 +9,28 @@ module.exports = {
     try {
       const prompt = args.join(' ');
       if (!prompt) {
-        return await bot.sendMessage(chatId, { text: "Dis-moi ce que tu veux que j'imagine ! 🎨\n\nEx: *imagine un paysage futuriste au Cameroun" }, { quoted: message });
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nSpécifiez une description pour la génération d'image : \`${bot.config?.prefix || '*'}imagine [description]\`.` }, { quoted: message });
       }
 
-      await bot.sendMessage(chatId, { text: "⏳ Je connecte mes neurones artistiques... 🎨✨" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Génération Visuelle*\nTraitement de la requête graphique en cours...` }, { quoted: message });
 
-      // Using Pollinations AI - very reliable and no key needed for simple usage
       const seed = Math.floor(Math.random() * 1000000);
-      // Use explicit image endpoint for better API behavior
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
 
-      // Download buffer to ensure delivery (fixes "video error" or broken thumbnail)
       const response = await axios.get(imageUrl, {
         responseType: 'arraybuffer',
-        timeout: 60000 // 60 seconds timeout
+        timeout: 60000
       });
       const buffer = Buffer.from(response.data);
 
       await bot.sendMessage(chatId, {
         image: buffer,
-        caption: `🎨 *Art by Psycho Bo* 🤙✨\n\n📝 *Prompt:* ${prompt}\n🚀 *Model:* Flux (Xyber-Elite)`
+        caption: `* \`${bot.botName || 'Diane'}\` *\n\n*Rendu Graphique*\nRequête : \`${prompt}\`\nMoteur : \`Flux v4.0\``
       }, { quoted: message });
 
     } catch (error) {
       log.error('Imagine command failed:', error.message);
-      await bot.sendMessage(chatId, { text: "Mon pinceau est cassé là... 🛠️ Réessaie plus tard !" }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nLe moteur de rendu est actuellement indisponible.` }, { quoted: message });
     }
   }
 };

@@ -8,20 +8,20 @@ module.exports = {
       const stickerMessage = quoted?.stickerMessage;
 
       if (!stickerMessage) {
-        return await bot.sendSafeMessage(chatId, `faut répondre à un sticker avec la commande .`);
+        return await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nVeuillez répondre à un sticker avec cette commande.` });
       }
 
-      await bot.sendMessage(chatId, { text: `⏳ Conversion en cours...` }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Traitement de Média*\nExtraction de la couche graphique en cours...` }, { quoted: message });
 
       const buffer = await bot.downloadMedia(stickerMessage, 'sticker');
 
       await bot.sendMessage(chatId, {
         image: buffer,
-        caption: `Tiens ! ✨`
+        caption: `* \`${bot.botName || 'Diane'}\` *\n\n*Rendu PNG Terminé*`
       }, { quoted: message });
 
     } catch (error) {
-      await bot.sendSafeMessage(chatId, `j'ai pas réussi à convertir :/`);
+      await bot.sendMessage(chatId, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nÉchec de la conversion graphique.` });
     }
   }
 };

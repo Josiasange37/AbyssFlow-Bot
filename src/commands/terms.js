@@ -4,14 +4,16 @@ module.exports = {
   description: 'Bot terms of service',
   async execute({ chatId, bot }) {
     const text = [
-      `*📜 Conditions d'Utilisation*`,
+      `* \`${bot.botName || 'Diane'}\` *`,
       ``,
-      `- Pas de spam.`,
-      `- Pas de trucs illégaux.`,
-      `- Sois respectueux.`,
+      `*PROTOCOLE D' UTILISATION ET CONDITIONS*`,
       ``,
-      `Si tu spammes, je peux te block direct. 🚫`
+      `1. L'utilisation à des fins de saturation (spam) est proscrite.`,
+      `2. Toute activité illégale via cette interface est strictement interdite.`,
+      `3. Le respect du code de conduite inter-unités est impératif.`,
+      ``,
+      `Le non-respect de ces protocoles entraînera une révocation immédiate des droits d'accès.`
     ].join('\n');
-    await bot.sendSafeMessage(chatId, text);
+    await bot.sendMessage(chatId, { text });
   }
 };
