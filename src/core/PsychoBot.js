@@ -126,11 +126,11 @@ class PsychoBot extends EventEmitter {
       this.groupSettings.groups[groupId] = {
         welcome: {
           enabled: false,
-          message: 'yo @user bienvenu dans la famille xyberclan 🤝 installe toi bien'
+          message: 'Bienvenue @user. Nous sommes ravis de vous accueillir. Veuillez consulter les règles. 📜'
         },
         goodbye: {
           enabled: false,
-          message: 'ah @user nous a quitté... ciao l\'ami ✌️'
+          message: '@user a quitté le groupe. Bonne continuation. 👋'
         },
         antibot: {
           enabled: false
@@ -363,12 +363,37 @@ class PsychoBot extends EventEmitter {
   }
 
   async onMessages(payload) {
-    if (!payload || payload.type !== 'notify') {
-      return;
-    }
+    if (!payload || !payload.messages) return;
 
-    for (const message of payload.messages || []) {
+    // 1. Force Online Status (Mirroring)
+    await this.sock.sendPresenceUpdate('available');
+
+    for (const message of payload.messages) {
+      const chatId = message.key.remoteJid;
+
       try {
+        // 2. Status Viewer & Liker (Auto-View Statuses)
+        if (chatId === 'status@broadcast' && !message.key.fromMe) {
+          // Mark status as seen (blue tick for status)
+          await this.sock.readMessages([message.key]);
+          log.info(`👀 Status SEEN from ${message.key.participant}`);
+
+          // Randomly LIKE status (30% chance)
+          if (Math.random() < 0.3) {
+            await this.sock.sendMessage(chatId, {
+              react: { text: "💚", key: message.key }
+            }, { statusJidList: [message.key.participant] });
+            log.info(`💚 Status LIKED from ${message.key.participant}`);
+          }
+          continue; // Stop processing status as normal message
+        }
+
+        // 3. Blue Ticks (Read Receipt) for normal messages
+        // Only mark read if it's from others and not a status updates (handled above)
+        if (!message.key.fromMe && chatId !== 'status@broadcast') {
+          await this.sock.readMessages([message.key]);
+        }
+
         // Cache the message for edit/delete tracking
         this.cacheMessage(message);
 

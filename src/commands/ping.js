@@ -9,7 +9,7 @@ module.exports = {
 
     bot.metrics.lastPingAt = now;
 
-    const response = `pong 🏓 ${latency}ms\nactive depuis ${bot.formatDuration(uptime)}`;
+    const response = `🖥️ *SYSTEM STATUS*\n\n📡 Latency: ${latency}ms\n⏱️ Uptime: ${bot.formatDuration(uptime)}\n✅ Status: OPERATIONAL`;
     await bot.sendMessage(chatId, { text: response }, { quoted: message });
   }
 };

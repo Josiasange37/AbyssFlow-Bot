@@ -8,10 +8,10 @@ module.exports = {
       const mediaMessage = quoted?.imageMessage || quoted?.videoMessage;
 
       if (!mediaMessage) {
-        return await bot.sendSafeMessage(chatId, `faut m'envoyer une image ou une vidéo (ou répondre à une) avec la commande ${config.prefix}sticker .`);
+        return await bot.sendSafeMessage(chatId, `❌ *Erreur:* Veuillez envoyer une image ou vidéo avec la commande *${config.prefix}sticker*.`);
       }
 
-      await bot.sendMessage(chatId, { text: `⏳ Je prépare ton sticker...` }, { quoted: message });
+      await bot.sendMessage(chatId, { text: `⚙️ *Traitement en cours...*` }, { quoted: message });
 
       const type = quoted?.imageMessage ? 'image' : 'video';
       const buffer = await bot.downloadMedia(mediaMessage, type);
@@ -21,7 +21,7 @@ module.exports = {
       }, { quoted: message });
 
     } catch (error) {
-      await bot.sendSafeMessage(chatId, `gros fail sur le sticker: ${error.message}`);
+      await bot.sendSafeMessage(chatId, `❌ *Échec de la conversion:* ${error.message}`);
     }
   }
 };
