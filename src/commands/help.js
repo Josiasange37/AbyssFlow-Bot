@@ -7,32 +7,36 @@ module.exports = {
     const prefix = config.prefix;
     const isOwner = bot.isOwner(message.key.participant || message.key.remoteJid);
 
-    // 1. Gather Commands
-    const allCommands = [];
+    // 1. Gather Commands & Group by Category
+    const categories = {};
     bot.commands.forEach((cmd, key) => {
       if (cmd.name.toLowerCase() !== key.toLowerCase()) return; // Skip aliases
-
       const isRestricted = cmd.category === 'admin' || cmd.isOwner;
       if (isRestricted && !isOwner) return;
 
-      allCommands.push({
-        name: cmd.name,
-        category: cmd.category || 'misc',
-        desc: cmd.description || 'N/A'
-      });
+      const cat = cmd.category || 'diverse';
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(cmd.name);
     });
 
-    // 2. Sort by Category then Name
-    allCommands.sort((a, b) => {
-      if (a.category !== b.category) return a.category.localeCompare(b.category);
-      return a.name.localeCompare(b.name);
-    });
+    const sortedCats = Object.keys(categories).sort();
 
-    // 3. Pagination (5 items per page)
-    const ITEMS_PER_PAGE = 5;
-    const totalPages = Math.ceil(allCommands.length / ITEMS_PER_PAGE);
+    // 2. Build Pages (Max 5 per page, NO MIXING categories)
+    const pages = [];
+    for (const cat of sortedCats) {
+      const cmds = categories[cat].sort();
+      const ITEMS_PER_PAGE = 5;
+      for (let i = 0; i < cmds.length; i += ITEMS_PER_PAGE) {
+        pages.push({
+          category: cat.toUpperCase(),
+          commands: cmds.slice(i, i + ITEMS_PER_PAGE)
+        });
+      }
+    }
 
-    // Parse Page Number
+    const totalPages = pages.length;
+
+    // 3. Parse Page Number
     let pageNum = 1;
     let arg = args[0] ? args[0].toLowerCase() : null;
     if (arg === 'next') {
@@ -49,30 +53,24 @@ module.exports = {
     if (!bot.helpPageCache) bot.helpPageCache = new Map();
     bot.helpPageCache.set(chatId, pageNum);
 
-    // 4. Build Display
-    const startObj = (pageNum - 1) * ITEMS_PER_PAGE;
-    const itemsFn = allCommands.slice(startObj, startObj + ITEMS_PER_PAGE);
-
+    // 4. Build Display Output
+    const currentPage = pages[pageNum - 1];
     const lines = [];
 
-    lines.push(`*DIANE*`);
+    lines.push(`* \`${bot.botName || 'Diane'}\` *`);
     lines.push(``);
     lines.push(`*Aide*`);
-    lines.push(`Utilisation : *${prefix}help [commande]* pour plus de détails.`);
+    lines.push(`Utilisation : \`${prefix}help [commande]\``);
     lines.push(``);
+    lines.push(`*${currentPage.category}*`);
 
-    let currentCat = null;
-    itemsFn.forEach(cmd => {
-      if (cmd.category !== currentCat) {
-        currentCat = cmd.category;
-        lines.push(`*${currentCat.toUpperCase()}*`);
-      }
-      lines.push(`• ${cmd.name}`);
+    currentPage.commands.forEach(cmdName => {
+      lines.push(` \`• ${cmdName}\` `);
     });
 
     lines.push(``);
-    lines.push(`Page *${pageNum}* de *${totalPages}*`);
-    lines.push(`Tapez *${prefix}help next* pour la page suivante.`);
+    lines.push(` \`Page ${pageNum} sur ${totalPages}\` `);
+    lines.push(`Tapez \`${prefix}help next\` pour la suite.`);
 
     await bot.sendMessage(chatId, {
       text: lines.join('\n'),
