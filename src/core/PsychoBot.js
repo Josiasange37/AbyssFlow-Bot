@@ -718,25 +718,33 @@ class PsychoBot extends EventEmitter {
    * Safe sendMessage wrapper that checks connection status
    */
   async sendMessage(jid, content, options = {}) {
-    if (!this.sock) return null;
+    if (!this.sock) {
+      log.warn('Cannot send message: No active socket connection');
+      return null;
+    }
     try {
+      const { withTimeout } = require('../utils/helpers');
+
       // --- GHOST PROTOCOL: Human-Like Presence (Phase 9) ---
       if (!this.cloakMode && !options.noDelay) {
-        const delayTime = Math.floor(Math.random() * 1500) + 800; // 0.8s - 2.3s
+        const delayTime = Math.floor(Math.random() * 1000) + 800; // 0.8s - 1.8s
         const status = content.audio ? 'recording' : 'composing';
 
-        await this.sock.sendPresenceUpdate(status, jid);
+        await this.sock.sendPresenceUpdate(status, jid).catch(() => { });
         await delay(delayTime);
-        await this.sock.sendPresenceUpdate('paused', jid);
+        await this.sock.sendPresenceUpdate('paused', jid).catch(() => { });
       }
 
-      return await this.sock.sendMessage(jid, content, options);
+      log.debug(`[SEND_MESSAGE] Target: ${jid} | Type: ${Object.keys(content).join(', ')}`);
+
+      // Add 20s timeout to protect the loop
+      return await withTimeout(
+        this.sock.sendMessage(jid, content, options),
+        25000,
+        'Socket Timeout'
+      );
     } catch (error) {
-      if (error?.message === 'Connection Closed') {
-        log.warn(`Failed to send message to ${jid}: Connection Closed.`);
-      } else {
-        log.error(`SendMessage error for ${jid}:`, error.message);
-      }
+      log.error(`SendMessage error for ${jid}:`, error.message);
       return null;
     }
   }
@@ -1263,9 +1271,23 @@ class PsychoBot extends EventEmitter {
       }
 
       // Pass userName and availableCommands to Brain for Agentic Logic
-      // Show typing logic
-      await this.sock.sendPresenceUpdate('composing', chatId);
-      let response = await Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media, userName, availableCommands);
+      let response;
+      try {
+        const { withTimeout } = require('../utils/helpers');
+        // Pre-Brain Typing
+        if (!this.cloakMode) await this.sock.sendPresenceUpdate('composing', chatId).catch(() => { });
+
+        response = await withTimeout(
+          Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media, userName, availableCommands),
+          45000,
+          'Brain Timeout'
+        );
+        log.debug(`[AI_BRAIN] Response received (length: ${response?.length || 0})`);
+      } catch (err) {
+        log.error(`AI Brain error: ${err.message}`);
+        if (!this.cloakMode) await this.sock.sendPresenceUpdate('paused', chatId).catch(() => { });
+        return await this.sendMessage(chatId, { text: `* \`${this.botName || 'Diane'}\` *\n\n*Alerte*\nUne défaillance cognitive a été détectée dans le module neural.` }, { quoted: message });
+      }
 
       if (response) {
         // --- AGENTIC EXECUTION PROTOCOL ---
@@ -1335,18 +1357,23 @@ class PsychoBot extends EventEmitter {
         // --- NATIVE IMAGE DELIVERY ---
         if (finalResponse.startsWith('[IMAGE]')) {
           const imageUrl = finalResponse.replace('[IMAGE]', '').trim();
-          if (!this.cloakMode) await simulateTyping(this.sock, chatId, 1000);
-
           try {
-            const { data } = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            const { data } = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
             await this.sendMessage(chatId, {
               image: Buffer.from(data),
-              caption: "✨ Voici ton image générée par Psycho Bot :"
-            }, { quoted: message });
+              caption: `* \`${this.botName || 'Diane'}\` *\n\n*Rendu Graphique Exécuté*`
+            }, { quoted: message, noDelay: true }); // noDelay because we already simulated typing
           } catch (e) {
             log.error('Failed to download/send AI image:', e.message);
-            await this.sendMessage(chatId, { text: "Oups, j'ai raté le dessin... 📉" }, { quoted: message });
+            await this.sendMessage(chatId, { text: `* \`${this.botName || 'Diane'}\` *\n\n*Erreur*\nÉchec de la récupération du flux visuel.` }, { quoted: message });
           }
+          return;
+        }
+
+        // --- EMPTY RESPONSE FALLBACK ---
+        if (!finalResponse || finalResponse.trim().length === 0) {
+          log.warn(`[AI_BRAIN] Empty response generated for ${chatId}. Sending fallback.`);
+          await this.sendMessage(chatId, { text: `* \`${this.botName || 'Diane'}\` *\n\nJe n'ai pas pu formuler une réponse cohérente. Veuillez reformuler votre requête.` }, { quoted: message });
           return;
         }
 
@@ -1354,15 +1381,11 @@ class PsychoBot extends EventEmitter {
         const responseMentions = [sender, ...mentionedJids];
 
         if (!this.cloakMode) {
+          const { calculateTypingDuration, simulateTyping } = require('../utils/helpers');
           const typingDuration = calculateTypingDuration(finalResponse.length);
           await simulateTyping(this.sock, chatId, typingDuration);
         }
         // --- VOICE MIXING LOGIC ---
-        // Conditions: 
-        // 1. Is DM OR (Is Group AND Voice Enabled)
-        // 2. Response is short enough (< 400 chars)
-        // 3. Not an image/code block response
-        // 4. Random chance (35%)
         const groupSettings = isGroup ? await this.getGroupSettings(chatId) : null;
         const voiceAllowed = !isGroup || (groupSettings && groupSettings.voiceEnabled); // DM always allowed, Group depends on settings
 
@@ -1373,7 +1396,7 @@ class PsychoBot extends EventEmitter {
           Math.random() < 0.35; // 35% chance
 
         if (shouldVoice) {
-          await this.sock.sendPresenceUpdate('recording', chatId);
+          await this.sock.sendPresenceUpdate('recording', chatId).catch(() => { });
           // Small delay to simulate recording
           await delay(1500);
           const audioPath = await VoiceManager.generateAudio(finalResponse);
@@ -1382,7 +1405,7 @@ class PsychoBot extends EventEmitter {
               audio: { url: audioPath },
               mimetype: 'audio/mpeg',
               ptt: true
-            }, { quoted: message });
+            }, { quoted: message, noDelay: true });
             return; // Sent voice, skip text
           }
         }
@@ -1390,7 +1413,7 @@ class PsychoBot extends EventEmitter {
         await this.sendMessage(chatId, {
           text: finalResponse,
           mentions: responseMentions
-        }, { quoted: message });
+        }, { quoted: message, noDelay: true }); // Avoid double delay since simulateTyping ran above
       }
       return;
     }
@@ -1631,21 +1654,7 @@ class PsychoBot extends EventEmitter {
     }
   }
 
-  async sendMessage(jid, content, options = {}) {
-    if (!this.sock) {
-      log.warn('Cannot send message: No active socket connection');
-      return;
-    }
-
-    try {
-      // Automatic retry logic for "Bad MAC" errors if needed could go here, 
-      // but Baileys usually handles retries via receipts.
-      return await this.sock.sendMessage(jid, content, options);
-    } catch (error) {
-      log.error(`Failed to send message to ${jid}:`, error.message);
-      throw error;
-    }
-  }
+  // Consolidated sendMessage moved to line 720
 
   withinRateLimit(jid) {
     const now = Date.now();

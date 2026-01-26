@@ -54,21 +54,29 @@ class VoiceManager {
 
             // 6. Handle Stream Pipe with Proper Cleanup
             return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    ttsInstance.close();
+                    reject(new Error('TTS Streaming Timeout'));
+                }, 20000);
+
                 audioStream.pipe(writeStream);
 
                 // CRITICAL: Only close connection AFTER file is full written
                 writeStream.on('finish', () => {
+                    clearTimeout(timeout);
                     ttsInstance.close(); // Clean close
                     resolve(filePath);
                 });
 
                 writeStream.on('error', (err) => {
+                    clearTimeout(timeout);
                     log.error('File Write Error:', err);
                     ttsInstance.close();
                     reject(err);
                 });
 
                 audioStream.on('error', (err) => {
+                    clearTimeout(timeout);
                     log.error('TTS Stream Error:', err);
                     ttsInstance.close();
                     reject(err);
