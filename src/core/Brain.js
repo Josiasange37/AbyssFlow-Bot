@@ -296,6 +296,26 @@ class PsychoBrain {
         return response;
     }
 
+    async generateAutoMessage(type) {
+        let prompt;
+        if (type === 'morning') {
+            prompt = "Génère un message de bonjour professionnel et chaleureux pour le groupe. Présente-toi comme Diane, l'assistante exécutive. Sois brève (1-2 phrases).";
+        } else if (type === 'midnight') {
+            prompt = "Génère un message de clôture professionnel pour la fin de journée. Souhaite une bonne nuit au groupe. Sois brève (1-2 phrases).";
+        } else {
+            prompt = "Salue le groupe de manière professionnelle.";
+        }
+
+        if (this.isProviderAvailable('groq')) {
+            try {
+                return await GroqProvider.process(prompt, [], "Tu es Diane, une assistante exécutive professionnelle et efficace.");
+            } catch (e) {
+                log.error(`Auto message generation failed: ${e.message}`);
+            }
+        }
+        return type === 'morning' ? "Bonjour à tous. Je suis Diane, votre assistante exécutive. Je reste à votre entière disposition." : "La journée s'achève. Je vous souhaite une excellente soirée et un repos bien mérité.";
+    }
+
     async generateStatus() {
         // Use Groq for status
         if (this.isProviderAvailable('groq')) {

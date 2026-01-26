@@ -54,22 +54,25 @@ module.exports = {
     const itemsFn = allCommands.slice(startObj, startObj + ITEMS_PER_PAGE);
 
     const lines = [];
-    lines.push(`ABYSSFLOW PROTOCOL // SYSTEM MENU`);
-    lines.push(`UserID: ${message.key.participant ? message.key.participant.split('@')[0] : 'Unknown'}`);
-    lines.push(`──────────────────────────────`);
+
+    lines.push(`*DIANE*`);
+    lines.push(``);
+    lines.push(`*Aide*`);
+    lines.push(`Utilisation : *${prefix}help [commande]* pour plus de détails.`);
+    lines.push(``);
 
     let currentCat = null;
     itemsFn.forEach(cmd => {
       if (cmd.category !== currentCat) {
         currentCat = cmd.category;
-        lines.push(`\n[ MODULE: ${currentCat.toUpperCase()} ]`);
+        lines.push(`*${currentCat.toUpperCase()}*`);
       }
-      lines.push(`> ${prefix}${cmd.name}`);
-      lines.push(`  ${cmd.desc}`);
+      lines.push(`• ${cmd.name}`);
     });
 
     lines.push(``);
-    lines.push(`Page ${pageNum} of ${totalPages}  |  Type ${prefix}help next`);
+    lines.push(`Page *${pageNum}* de *${totalPages}*`);
+    lines.push(`Tapez *${prefix}help next* pour la page suivante.`);
 
     await bot.sendMessage(chatId, {
       text: lines.join('\n'),
