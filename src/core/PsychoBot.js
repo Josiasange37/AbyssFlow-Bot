@@ -1,3 +1,4 @@
+
 const EventEmitter = require('events');
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, delay, downloadMediaMessage, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const mongoose = require('mongoose');
@@ -55,6 +56,7 @@ class PsychoBot extends EventEmitter {
     this.settingsCache = new Map(); // Cache for group settings
     this.dramaTracker = new Map(); // Track message spikes for drama detection
     this.cloakMode = false; // Phase 2: Stealth Cloaking
+    this.ownerPresence = 'unavailable'; // Track owner availability for Sovereign Mode
 
 
     if (!CONFIG.owners.length) {
@@ -137,6 +139,36 @@ class PsychoBot extends EventEmitter {
       this.saveGroupSettings();
     }
     return this.groupSettings.groups[groupId];
+  }
+
+  /**
+   * Tracks the owner's presence status.
+   * If owner is 'available' (Online), the bot goes into "Ghost Mode" (Passive).
+   * If owner is 'unavailable' (Offline), the bot becomes "Sovereign" (Active).
+   */
+  async onPresenceUpdate(update) {
+    const { id, presences } = update;
+
+    // We iterate over known owners
+    CONFIG.owners.forEach(ownerNumber => {
+      const ownerJid = `${ownerNumber}@s.whatsapp.net`;
+      if (id === ownerJid || (presences && presences[ownerJid])) {
+        const presence = presences ? presences[ownerJid] : update;
+        // lastKnownPresence can be 'available' or 'unavailable' (or 'composing' sometimes)
+        const status = presence?.lastKnownPresence || 'unavailable';
+
+        // Only update if changed
+        if (this.ownerPresence !== status) {
+          this.ownerPresence = status;
+          log.info(`[SOVEREIGN] Creator ${ownerNumber} is now ${status.toUpperCase()}`);
+
+          // If owner comes online, stop any auto-activity
+          if (status === 'available') {
+            // Optional: cancel pending AI actions?
+          }
+        }
+      }
+    });
   }
 
   async loadCommands() {
@@ -245,6 +277,7 @@ class PsychoBot extends EventEmitter {
       this.sock.ev.on('messages.upsert', (payload) => this.onMessages(payload));
       this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
+      this.sock.ev.on('presence.update', (update) => this.onPresenceUpdate(update));
 
 
 
@@ -984,8 +1017,15 @@ class PsychoBot extends EventEmitter {
     // Sovereign Assistant Rule (Passive Assistance)
     const isNameMentioned = text && (
       normalizedText.includes(this.botName.toLowerCase()) ||
-      normalizedText.includes('diane')
+      normalizedText.includes('diane') ||
+      normalizedText.includes('psycho') ||
+      normalizedText.includes('bot')
     );
+
+    // Debug Trigger
+    if (isGroup && (normalizedText.includes('diane') || normalizedText.includes('psycho'))) {
+      log.info(`[DEBUG] Name Mentioned: ${isNameMentioned} | Text: "${normalizedText}"`);
+    }
 
     // AI only responds to Direct Interaction or Name Mention in groups
     const isBotTriggered = isTagMentioned || isReplyToBot || isDM || (isGroup && isNameMentioned);
@@ -1058,9 +1098,19 @@ class PsychoBot extends EventEmitter {
     // B. AI Processing
     if (isBotTriggered && Brain) {
       // Check if chatbot is enabled for this group
-      if (isGroup && settings && !settings.chatbot) return;
+      if (isGroup) {
+        log.debug(`[DEBUG-AI] Group Settings: ${JSON.stringify(settings)}`);
+        // STRICT CHECK: Only disable if EXPLICITLY false
+        if (settings && settings.chatbot === false) {
+          log.debug('[DEBUG-AI] Chatbot explicitly disabled.');
+          return;
+        }
+      }
       // Exempt owner from rate limit
-      if (!isOwner && !this.withinRateLimit(sender)) return;
+      if (!isOwner && !this.withinRateLimit(sender)) {
+        log.debug('[DEBUG-AI] Rate limited.');
+        return;
+      }
 
       if (LOG_THRESHOLD >= LOG_LEVEL_MAP.info && isGroup) {
         log.info(`[AI] Triggered in Group | From: ${sender} | Tag: ${isTagMentioned}, Reply: ${isReplyToBot}`);
@@ -1110,9 +1160,15 @@ class PsychoBot extends EventEmitter {
       // Empty interaction feedback
       if (!cleanText && !media) {
         if (isTagMentioned) await this.sendMessage(chatId, { text: "Besoin d'aide ? Je suis à ton écoute. 🤙⚡" }, { quoted: message });
-        else if (isReplyToBot) await this.sendMessage(chatId, { text: "Je t'écoute. Dis-moi un truc !" }, { quoted: message });
-        return;
+        // Allow replying to empty messages if it's a direct reply or DM
+        else if (isReplyToBot || isDM) await this.sendMessage(chatId, { text: "Je t'écoute..." }, { quoted: message });
+        else return;
       }
+
+      // --- SOVEREIGN MODE: Check Owner Status ---
+      // If owner is ONLINE, the bot should be silent (Ghost Mode), unless explicitly tagged in a group.
+      // Auto-reply only active when owner is OFFLINE.
+
 
       // --- AI CONTEXT ENHANCEMENT: Group Participants ---
 
@@ -1237,6 +1293,36 @@ class PsychoBot extends EventEmitter {
           const typingDuration = calculateTypingDuration(finalResponse.length);
           await simulateTyping(this.sock, chatId, typingDuration);
         }
+        // --- VOICE MIXING LOGIC ---
+        // Conditions: 
+        // 1. Is DM OR (Is Group AND Voice Enabled)
+        // 2. Response is short enough (< 400 chars)
+        // 3. Not an image/code block response
+        // 4. Random chance (35%)
+        const groupSettings = isGroup ? await this.getGroupSettings(chatId) : null;
+        const voiceAllowed = !isGroup || (groupSettings && groupSettings.voiceEnabled); // DM always allowed, Group depends on settings
+
+        const shouldVoice = voiceAllowed &&
+          finalResponse.length < 400 &&
+          !finalResponse.includes('```') &&
+          !finalResponse.includes('[IMAGE]') &&
+          Math.random() < 0.35; // 35% chance
+
+        if (shouldVoice) {
+          await this.sock.sendPresenceUpdate('recording', chatId);
+          // Small delay to simulate recording
+          await delay(1500);
+          const audioPath = await VoiceManager.generateAudio(finalResponse);
+          if (audioPath) {
+            await this.sendMessage(chatId, {
+              audio: { url: audioPath },
+              mimetype: 'audio/mpeg',
+              ptt: true
+            }, { quoted: message });
+            return; // Sent voice, skip text
+          }
+        }
+
         await this.sendMessage(chatId, {
           text: finalResponse,
           mentions: responseMentions

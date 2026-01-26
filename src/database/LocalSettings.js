@@ -13,7 +13,15 @@ class LocalSettings {
     }
 
     get(groupId) {
-        return this.data[groupId] || { voiceEnabled: false };
+        const defaults = {
+            voiceEnabled: false,
+            chatbot: true, // Default to true
+            welcome: true,
+            autoMod: true,
+            antiDelete: true
+        };
+        // Merge stored data on top of defaults
+        return { ...defaults, ...(this.data[groupId] || {}) };
     }
 
     set(groupId, settings) {
