@@ -51,6 +51,7 @@ class PsychoBot extends EventEmitter {
 
     // Message cache for tracking edits and deletions (max 1000 messages)
     this.messageCache = new Map();
+    this.statusCache = new Map(); // Cache for Status updates (for tagging/screenshot)
     this.maxCacheSize = 1000;
     this.metadataCache = new Map(); // Cache for group participants
     this.settingsCache = new Map(); // Cache for group settings
@@ -278,6 +279,7 @@ class PsychoBot extends EventEmitter {
       this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
       this.sock.ev.on('presence.update', (update) => this.onPresenceUpdate(update));
+      this.sock.ev.on('messages.reaction', (reactions) => this.onReaction(reactions));
 
 
 
@@ -483,6 +485,59 @@ class PsychoBot extends EventEmitter {
       }
     } catch (error) {
       log.error('Group participants update error:', error.message);
+    }
+  }
+
+  async onReaction(reactions) {
+    for (const reaction of reactions) {
+      try {
+        // 1. Check Trigger Emojis
+        const triggers = ['⚡', '🔓', '❤️', '😊', '👍', '😎'];
+        if (!triggers.includes(reaction.reaction.text)) continue;
+
+        // 2. Validate Admin/Owner
+        const reactorJid = reaction.key.participant || reaction.key.remoteJid;
+        const isOwner = this.isOwner(reactorJid);
+        if (!isOwner) continue;
+
+        // 3. Retrieve Cached Message
+        const msgId = reaction.key.id;
+        const cachedMsg = this.messageCache.get(msgId);
+        if (!cachedMsg || !cachedMsg.message) continue;
+
+        // 4. Construct Fake Message Context to mimic *extract reply
+        const fakeMessage = {
+          key: {
+            remoteJid: reaction.key.remoteJid,
+            participant: reactorJid,
+            id: `RX-${Date.now()}`
+          },
+          message: {
+            extendedTextMessage: {
+              text: `${CONFIG.prefix || '*'}extract`,
+              contextInfo: {
+                quotedMessage: cachedMsg.message,
+                stanzaId: msgId,
+                participant: cachedMsg.sender
+              }
+            }
+          }
+        };
+
+        // 5. Execute Command
+        const extractCmd = this.commands.get('extract');
+        if (extractCmd) {
+          log.info(`[REACTION] Triggering extract for ${reactorJid}`);
+          await extractCmd.execute({
+            sock: this.sock,
+            message: fakeMessage,
+            bot: this
+          });
+        }
+
+      } catch (err) {
+        log.error('Reaction handler error:', err.message);
+      }
     }
   }
 
@@ -1048,13 +1103,27 @@ class PsychoBot extends EventEmitter {
   async handleMessage(message) {
     if (!message?.message) return;
     const chatId = message.key.remoteJid;
-    if (!chatId || chatId === 'status@broadcast') return;
+
+    // Status Caching Logic
+    if (chatId === 'status@broadcast') {
+      const sender = message.key.participant || message.key.remoteJid;
+      if (sender && message.message) {
+        this.statusCache.set(sender, message);
+        // Log only if verbose or debugging
+        if (LOG_THRESHOLD >= LOG_LEVEL_MAP.debug) {
+          log.debug(`[STATUS] Cached status from ${sender}`);
+        }
+      }
+      return; // Capture status and exit, don't process as chat message
+    }
+
+    if (!chatId) return;
 
     const text = this.extractText(message);
     const isPrefixed = text && text.startsWith(CONFIG.prefix);
 
-    // Ignore itself UNLESS it's a command
-    if (message.key.fromMe && !isPrefixed) return;
+    // Strictly ignore ALL messages from self to prevent feedback loops
+    if (message.key.fromMe) return;
 
     const sender = message.key.participant || message.key.remoteJid;
     const userName = message.pushName || 'Inconnu';

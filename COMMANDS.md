@@ -46,6 +46,30 @@ Recherche et affiche le profil de n'importe quel utilisateur GitHub.
 
 ---
 
+## 🎨 Commandes Multimédia (Tools)
+
+### `*status` (aliases: `statusdown`, `saver`)
+Télécharge un statut WhatsApp (Photo/Vidéo).
+- **Usage**: Répondez au statut avec `*status`.
+- **Accès**: Tous les utilisateurs
+
+### `*pp` (alias: `profilepic`)
+Télécharge la photo de profil (HD) d'un utilisateur.
+- **Usage**: `*pp` (en réponse) OU `*pp @user`
+- **Accès**: Tous les utilisateurs
+
+### `*sticker` (aliases: `s`, `stick`)
+Convertit une image, GIF ou vidéo en sticker.
+- **Usage**: Répondez au média avec `*sticker`.
+- **Accès**: Tous les utilisateurs
+
+### `*tovideo` (aliases: `tomp4`)
+Convertit un sticker animé en vidéo MP4.
+- **Usage**: Répondez au sticker avec `*tovideo`.
+- **Accès**: Tous les utilisateurs
+
+---
+
 ## 🛡️ Commandes Admin de Groupe (Créateur + Admins)
 
 ### `*kick` (alias: `*remove`)
@@ -79,6 +103,13 @@ Exécute du code JavaScript (à implémenter).
 - **Accès**: Propriétaires uniquement
 - **⚠️ Danger**: Utiliser avec précaution
 - **Exemple**: `*eval console.log('test')`
+
+### `*extract` (aliases: `vv`)
+Extrait un média View Once de manière anonyme.
+- **Trigger**: Commande `*extract` (en réponse) OU réaction (⚡, 🔓, ❤️, 😊)
+- **Action**: Envoie le média décrypté en DM à l'admin
+- **Accès**: Propriétaires uniquement
+- **Status**: Incognito 🕵️
 
 ---
 

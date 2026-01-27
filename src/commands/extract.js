@@ -2,18 +2,34 @@ const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
 
 module.exports = {
     name: 'extract',
-    description: 'Extrait un média View Once de manière anonyme.',
-    category: 'tools',
+    description: 'Extrait un média View Once de manière anonyme (Owner/Reaction only).',
+    category: 'admin',
     aliases: ['vv', 'viewonce'],
+    isOwner: true, // Restricted to Bot Owners
+    isAdmin: true, // Keeping generic admin flag just in case, but owner check is primary
     execute: async ({ sock, message, bot }) => {
         try {
-            const remoteJid = message.key.remoteJid;
+            // Determine the target chat for the reply (DM)
+            const senderJid = message.key.participant || message.key.remoteJid;
+
+            // If triggered by reaction, message object might be different, but we'll standardize in PsychoBot.js or handle here. 
+            // For direct command usage:
             const quotedMsg = message.message?.extendedTextMessage?.contextInfo?.quotedMessage;
 
-            const reply = async (text) => await sock.sendMessage(remoteJid, { text }, { quoted: message });
+            const reply = async (text) => {
+                // Send feedback to the group (or where command was typed) if desired, 
+                // but for "incognito" maybe we only DM? 
+                // Original request said "extracted media should be sent directly to the bot user's inbox".
+                // Let's keep group reply minimial or nonexistent for incognito?
+                // Current implementation sends reply to remoteJid. Let's send a subtle confirmation to group or nothing?
+                // Strategy: Send "Processing..." to group (delete after?), send Media to DM.
+            };
 
             if (!quotedMsg) {
-                return reply(`* \`${bot.botName || 'Diane'}\` *\n\n*Aide à l'utilisation*\nVeuillez répondre à un contenu éphémère avec \`${bot.config?.prefix || '*'}extract\`.`);
+                // If run without quote, maybe just return? Or silent fail if we want true stealth?
+                // Let's keep a help message if they explicitly typed the command.
+                await sock.sendMessage(message.key.remoteJid, { text: `* \`${bot.botName || 'Diane'}\` *\n\nRépondez à un média View Once.` }, { quoted: message });
+                return;
             }
 
             let content = quotedMsg;
@@ -27,33 +43,34 @@ module.exports = {
                     content.audioMessage ? 'audio' : null;
 
             if (!mediaType) {
-                return reply(`* \`${bot.botName || 'Diane'}\` *\n\n*Erreur*\nType de média non supporté par le protocole d'extraction.`);
+                await sock.sendMessage(message.key.remoteJid, { text: `* \`${bot.botName || 'Diane'}\` *\n\nType de média non supporté.` }, { quoted: message });
+                return;
             }
 
             const mediaData = content[`${mediaType}Message`];
             if (!mediaData || !mediaData.mediaKey) {
-                return reply(`* \`${bot.botName || 'Diane'}\` *\n\n*Erreur de Traitement*\nImpossible de décrypter le flux binaire. Accréditation de session expirée.`);
+                await sock.sendMessage(message.key.remoteJid, { text: `* \`${bot.botName || 'Diane'}\` *\n\nImpossible de décrypter.` }, { quoted: message });
+                return;
             }
 
+            const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
             const stream = await downloadContentFromMessage(mediaData, mediaType);
             let buffer = Buffer.from([]);
             for await (const chunk of stream) {
                 buffer = Buffer.concat([buffer, chunk]);
             }
 
-            const caption = `* \`${bot.botName || 'Diane'}\` *\n\n*Opération Terminée*\nLe média a été extrait de la couche volatile.`;
-            const options = { quoted: message };
+            const caption = `* \`${bot.botName || 'Diane'}\` *\n\n*Extraction Réussie* 🔓\nDe: Diffusé dans ${message.key.remoteJid.split('@')[0]}\nType: ${mediaType}`;
 
-            if (mediaType === 'image') {
-                await sock.sendMessage(remoteJid, { image: buffer, caption }, options);
-            } else if (mediaType === 'video') {
-                await sock.sendMessage(remoteJid, { video: buffer, caption }, options);
-            } else if (mediaType === 'audio') {
-                await sock.sendMessage(remoteJid, { audio: buffer, mimetype: 'audio/mp4', ptt: true }, options);
-            }
+            // Send to Admin's DM
+            await sock.sendMessage(senderJid, { [mediaType]: buffer, caption }, { quoted: null });
+
+            // Optional: React to original message to confirm receipt?
+            await sock.sendMessage(message.key.remoteJid, { react: { text: "✅", key: message.key } });
 
         } catch (err) {
-            await sock.sendMessage(message.key.remoteJid, { text: `* \`${bot.botName || 'Diane'}\` *\n\n*Interruption*\nÉchec critique lors de l'extraction des données.` }, { quoted: message });
+            console.error(err);
+            // Silent fail or DM error?
         }
     }
 };
