@@ -9,7 +9,7 @@ const cron = require('node-cron');
 const axios = require('axios');
 const sharp = require('sharp');
 const { log, LOG_THRESHOLD, LOG_LEVEL_MAP } = require('../utils/logger');
-const { normalizeNumber, calculateTypingDuration, simulateTyping } = require('../utils/helpers');
+const { normalizeNumber } = require('../utils/helpers');
 const LinkHandler = require('../utils/LinkHandler');
 const { CONFIG } = require('../config');
 const Brain = require('./Brain');
@@ -22,6 +22,8 @@ const useMongoAuthState = require('./mongoAuth');
 const qrcode = require('qrcode-terminal');
 const VoiceManager = require('../utils/VoiceManager'); // Import VoiceManager
 const LocalSettings = require('../database/LocalSettings');
+const Account = require('../database/models/Account');
+const PlanService = require('./PlanService');
 
 
 const baileysLogger = pino({ level: 'silent' });
@@ -34,6 +36,8 @@ class PsychoBot extends EventEmitter {
     this.fullSessionId = process.env.DEPLOYMENT_ID ? `${process.env.DEPLOYMENT_ID}_${this.sessionId}` : this.sessionId;
 
     this.botName = options.botName || CONFIG.botName || 'Psycho Bot';
+    this.accountId = options.accountId || sessionId;
+    this.account = null; // Will be loaded from DB
     this.sock = null;
     this.status = 'INITIALIZING';
     this.commands = new Map();
@@ -56,8 +60,6 @@ class PsychoBot extends EventEmitter {
     this.metadataCache = new Map(); // Cache for group participants
     this.settingsCache = new Map(); // Cache for group settings
     this.dramaTracker = new Map(); // Track message spikes for drama detection
-    this.cloakMode = false; // Phase 2: Stealth Cloaking
-    this.ownerPresence = 'unavailable'; // Track owner availability for Sovereign Mode
 
 
     if (!CONFIG.owners.length) {
@@ -66,12 +68,11 @@ class PsychoBot extends EventEmitter {
 
     this.loadCommands();
     // Use session-scoped DB connection if needed or share the global one
-    connectDB().then(() => {
+    connectDB().then(async () => {
+      await this.loadAccount();
       this.syncExileList().catch(e => log.error(`[${this.sessionId}] Sync Exile Error:`, e.message));
     }).catch(e => log.error(`[${this.sessionId}] DB Init Error:`, e.message));
     this.startAutoStatus();
-    this.startGhostCore();
-
   }
 
   /**
@@ -142,34 +143,42 @@ class PsychoBot extends EventEmitter {
     return this.groupSettings.groups[groupId];
   }
 
-  /**
-   * Tracks the owner's presence status.
-   * If owner is 'available' (Online), the bot goes into "Ghost Mode" (Passive).
-   * If owner is 'unavailable' (Offline), the bot becomes "Sovereign" (Active).
-   */
-  async onPresenceUpdate(update) {
-    const { id, presences } = update;
+  async loadAccount() {
+    try {
+      this.account = await Account.findOne({ _id: this.accountId }) ||
+        await Account.findOne({ email: this.accountId }); // Fallback to email search
 
-    // We iterate over known owners
-    CONFIG.owners.forEach(ownerNumber => {
-      const ownerJid = `${ownerNumber}@s.whatsapp.net`;
-      if (id === ownerJid || (presences && presences[ownerJid])) {
-        const presence = presences ? presences[ownerJid] : update;
-        // lastKnownPresence can be 'available' or 'unavailable' (or 'composing' sometimes)
-        const status = presence?.lastKnownPresence || 'unavailable';
-
-        // Only update if changed
-        if (this.ownerPresence !== status) {
-          this.ownerPresence = status;
-          log.info(`[SOVEREIGN] Creator ${ownerNumber} is now ${status.toUpperCase()}`);
-
-          // If owner comes online, stop any auto-activity
-          if (status === 'available') {
-            // Optional: cancel pending AI actions?
-          }
-        }
+      if (!this.account) {
+        log.warn(`[SaaS] Account not found for ${this.accountId}. Operating in restricted mode.`);
+      } else {
+        log.info(`[SaaS] Loaded account ${this.account.email} (Plan: ${this.account.plan})`);
       }
-    });
+    } catch (err) {
+      log.error(`[SaaS] Failed to load account: ${err.message}`);
+    }
+  }
+
+  /**
+   * Updates usage statistics in the database and local cache.
+   */
+  async updateSaaSUsage(actionType) {
+    if (!this.account) return;
+
+    try {
+      const update = {};
+      if (actionType === 'AI_RESPONSE') update['usage.ai_responses'] = 1;
+      if (actionType === 'SCRAPE') update['usage.scrapes'] = 1;
+      update['usage.commands_today'] = 1;
+
+      // Atomic increment in MongoDB
+      this.account = await Account.findByIdAndUpdate(
+        this.account._id,
+        { $inc: update },
+        { new: true }
+      );
+    } catch (err) {
+      log.error(`[SaaS] Usage update failed: ${err.message}`);
+    }
   }
 
   async loadCommands() {
@@ -233,20 +242,11 @@ class PsychoBot extends EventEmitter {
         version = [2, 3000, 1015901307]; // Fallback
       }
 
-      // Sovereign Signature Rotation (Phase 17)
-      const browserSignatures = [
-        ['AbyssFlow Auditor', 'Chrome', '120.0.0.0'],
-        ['Sovereign Core', 'MacOS', '14.2.1'],
-        ['Protocol V4', 'Windows', '11.0.0'],
-        ['XyberNode', 'Safari', '17.2']
-      ];
-      const selectedSignature = browserSignatures[Math.floor(Math.random() * browserSignatures.length)];
-
       this.sock = makeWASocket({
         version,
         auth: state,
         printQRInTerminal: !pairingNumber,
-        browser: pairingNumber ? ['Chrome (Linux)', '', ''] : selectedSignature,
+        browser: pairingNumber ? ['Chrome (Linux)', '', ''] : ['Chrome (Linux)', '', ''],
         markOnlineOnConnect: false,
         syncFullHistory: false,
         generateHighQualityLinkPreview: false,
@@ -278,7 +278,6 @@ class PsychoBot extends EventEmitter {
       this.sock.ev.on('messages.upsert', (payload) => this.onMessages(payload));
       this.sock.ev.on('messages.update', (updates) => this.onMessageUpdate(updates));
       this.sock.ev.on('group-participants.update', (update) => this.onGroupParticipantsUpdate(update));
-      this.sock.ev.on('presence.update', (update) => this.onPresenceUpdate(update));
       this.sock.ev.on('messages.reaction', (reactions) => this.onReaction(reactions));
 
 
@@ -373,30 +372,16 @@ class PsychoBot extends EventEmitter {
   async onMessages(payload) {
     if (!payload || !payload.messages) return;
 
-    // 1. Force Online Status (Mirroring)
-    await this.sock.sendPresenceUpdate('available');
-
     for (const message of payload.messages) {
       const chatId = message.key.remoteJid;
 
       try {
-        // 2. Status Viewer & Liker (Auto-View Statuses)
+        // Mark status as seen (blue tick for status)
         if (chatId === 'status@broadcast' && !message.key.fromMe) {
-          // Mark status as seen (blue tick for status)
           await this.sock.readMessages([message.key]);
           log.info(`👀 Status SEEN from ${message.key.participant}`);
-
-          // Randomly LIKE status (30% chance)
-          if (Math.random() < 0.3) {
-            await this.sock.sendMessage(chatId, {
-              react: { text: "💚", key: message.key }
-            }, { statusJidList: [message.key.participant] });
-            log.info(`💚 Status LIKED from ${message.key.participant}`);
-          }
           continue; // Stop processing status as normal message
         }
-
-        // 3. Blue Ticks (Read Receipt) for normal messages
         // Only mark read if it's from others and not a status updates (handled above)
         if (!message.key.fromMe && chatId !== 'status@broadcast') {
           await this.sock.readMessages([message.key]);
@@ -545,12 +530,9 @@ class PsychoBot extends EventEmitter {
     try {
       const { sleep } = require('../utils/helpers');
       const introSequence = [
-        `* \`Diane\` *\n\n*Alerte : Nouvelle Intégration*\nSalut la team ! 👋`,
-        `*Josias Aaron*, alias *Almight* - CTO & Red Team Lead chez \`XyberClan\`.\n\n*Qui il est :*\nDev fullstack camerounais passionné. Il a monté sa propre start-up spécialisée dans les solutions digitales : développement web, design et cybersécurité.`,
-        `*Son background :*\n\n• 2 ans d'XP en développement fullstack (vibe coding)\n• 1 an d'XP en red team / cybersécurité\n• CTO et cofondateur de \`XyberClan\``,
-        `*Sa stack technique :*\n\n• Frontend : \`React\`, \`Next.js\`, \`Tailwind CSS\`\n• Mobile : \`Flutter\`\n• Sécurité : \`Red team\`, \`Pentesting\``,
-        `*XyberClan, c'est quoi ?*\nUne start-up qui propose des solutions digitales complètes : du dev web sécurisé au design, en passant par l'audit de sécurité. On combine créativité technique et approche security-first.`,
-        `*Objectifs :*\nÉchange inter-développeurs, partage d'expériences, collaboration sur des projets innovants ou recherche de partenaires/clients pour \`XyberClan\`.\n\n• Portfolio : https://almightportfolio.vercel.app/\n• XyberClan : https://xyber-clan.vercel.app/\n\n*Let's connect! 🚀*`
+        `Salut la team ! 👋 Je suis *${this.botName || 'cet assistant'}*, un assistant WhatsApp prêt à aider.`,
+        `Commandes de base : utilisez mon préfixe (${CONFIG.prefix || '*'}) ou parlez-moi directement.`,
+        `Je suis disponible pour répondre à vos questions, gérer le groupe et automatiser des tâches.`
       ];
 
       for (const msg of introSequence) {
@@ -786,16 +768,6 @@ class PsychoBot extends EventEmitter {
     try {
       const { withTimeout } = require('../utils/helpers');
 
-      // --- GHOST PROTOCOL: Human-Like Presence (Phase 9) ---
-      if (!this.cloakMode && !options.noDelay) {
-        const delayTime = Math.floor(Math.random() * 1000) + 800; // 0.8s - 1.8s
-        const status = content.audio ? 'recording' : 'composing';
-
-        await this.sock.sendPresenceUpdate(status, jid).catch(() => { });
-        await delay(delayTime);
-        await this.sock.sendPresenceUpdate('paused', jid).catch(() => { });
-      }
-
       log.debug(`[SEND_MESSAGE] Target: ${jid} | Type: ${Object.keys(content).join(', ')}`);
 
       // Add 20s timeout to protect the loop
@@ -928,7 +900,7 @@ class PsychoBot extends EventEmitter {
 
       await this.sendMessage(chatId, {
         text: [
-          `* \`${this.botName || 'Diane'}\` *`,
+          `* \`${this.botName || 'Bot'}\` *`,
           '',
           `*Alerte : Modification de Message*`,
           `Utilisateur : \`${senderName}\``,
@@ -961,7 +933,7 @@ class PsychoBot extends EventEmitter {
         // Text message
         await this.sendMessage(chatId, {
           text: [
-            `* \`${this.botName || 'Diane'}\` *`,
+            `* \`${this.botName || 'Bot'}\` *`,
             '',
             `*Alerte : Suppression de Message*`,
             `Utilisateur : \`${senderName}\``,
@@ -1158,18 +1130,11 @@ class PsychoBot extends EventEmitter {
 
     const isDM = !isGroup;
 
-    // Sovereign Assistant Rule (Passive Assistance)
+    // Trigger on bot name or generic "bot" mention
     const isNameMentioned = text && (
       normalizedText.includes(this.botName.toLowerCase()) ||
-      normalizedText.includes('diane') ||
-      normalizedText.includes('psycho') ||
       normalizedText.includes('bot')
     );
-
-    // Debug Trigger
-    if (isGroup && (normalizedText.includes('diane') || normalizedText.includes('psycho'))) {
-      log.info(`[DEBUG] Name Mentioned: ${isNameMentioned} | Text: "${normalizedText}"`);
-    }
 
     // AI only responds to Direct Interaction or Name Mention in groups
     const isBotTriggered = isTagMentioned || isReplyToBot || isDM || (isGroup && isNameMentioned);
@@ -1241,6 +1206,14 @@ class PsychoBot extends EventEmitter {
 
     // B. AI Processing
     if (isBotTriggered && Brain) {
+      // --- SaaS PLAN CHECK (AI) ---
+      if (this.account) {
+        const canUseAI = await PlanService.canPerformAction(this.account, 'AI_RESPONSE');
+        if (!canUseAI) {
+          return await this.sendMessage(chatId, { text: `⚠️ *Quota AI Atteint: Plan ${this.account.plan}*\nVous avez épuisé vos réponses AI pour aujourd'hui. Veuillez upgrader votre plan.` }, { quoted: message });
+        }
+      }
+
       // Check if chatbot is enabled for this group
       if (isGroup) {
         log.debug(`[DEBUG-AI] Group Settings: ${JSON.stringify(settings)}`);
@@ -1312,15 +1285,7 @@ class PsychoBot extends EventEmitter {
         else return;
       }
 
-      // --- SOVEREIGN MODE: Check Owner Status ---
-      // If owner is ONLINE, the bot should be silent (Ghost Mode), unless explicitly tagged in a group.
-      // Auto-reply only active when owner is OFFLINE.
-
-
       // --- AI CONTEXT ENHANCEMENT: Group Participants ---
-
-      // Immediate feedback: Show typing status while processing
-      if (!this.cloakMode) await this.sock.sendPresenceUpdate('composing', chatId);
 
       let participantsInfo = "";
       let participantsMap = new Map();
@@ -1349,8 +1314,6 @@ class PsychoBot extends EventEmitter {
       let response;
       try {
         const { withTimeout } = require('../utils/helpers');
-        // Pre-Brain Typing
-        if (!this.cloakMode) await this.sock.sendPresenceUpdate('composing', chatId).catch(() => { });
 
         response = await withTimeout(
           Brain.process(cleanText + participantsInfo || "Analyse ce média.", chatId, media, userName, availableCommands),
@@ -1360,8 +1323,7 @@ class PsychoBot extends EventEmitter {
         log.debug(`[AI_BRAIN] Response received (length: ${response?.length || 0})`);
       } catch (err) {
         log.error(`AI Brain error: ${err.message}`);
-        if (!this.cloakMode) await this.sock.sendPresenceUpdate('paused', chatId).catch(() => { });
-        return await this.sendMessage(chatId, { text: `* \`${this.botName || 'Diane'}\` *\n\n*Alerte*\nUne défaillance cognitive a été détectée dans le module neural.` }, { quoted: message });
+        return await this.sendMessage(chatId, { text: `* \`${this.botName || 'Bot'}\` *\n\n*Alerte*\nUne défaillance cognitive a été détectée dans le module neural.` }, { quoted: message });
       }
 
       if (response) {
@@ -1436,11 +1398,11 @@ class PsychoBot extends EventEmitter {
             const { data } = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 15000 });
             await this.sendMessage(chatId, {
               image: Buffer.from(data),
-              caption: `* \`${this.botName || 'Diane'}\` *\n\n*Rendu Graphique Exécuté*`
+              caption: `* \`${this.botName || 'Bot'}\` *\n\n*Rendu Graphique Exécuté*`
             }, { quoted: message, noDelay: true }); // noDelay because we already simulated typing
           } catch (e) {
             log.error('Failed to download/send AI image:', e.message);
-            await this.sendMessage(chatId, { text: `* \`${this.botName || 'Diane'}\` *\n\n*Erreur*\nÉchec de la récupération du flux visuel.` }, { quoted: message });
+            await this.sendMessage(chatId, { text: `* \`${this.botName || 'Bot'}\` *\n\n*Erreur*\nÉchec de la récupération du flux visuel.` }, { quoted: message });
           }
           return;
         }
@@ -1448,18 +1410,13 @@ class PsychoBot extends EventEmitter {
         // --- EMPTY RESPONSE FALLBACK ---
         if (!finalResponse || finalResponse.trim().length === 0) {
           log.warn(`[AI_BRAIN] Empty response generated for ${chatId}. Sending fallback.`);
-          await this.sendMessage(chatId, { text: `* \`${this.botName || 'Diane'}\` *\n\nJe n'ai pas pu formuler une réponse cohérente. Veuillez reformuler votre requête.` }, { quoted: message });
+          await this.sendMessage(chatId, { text: `* \`${this.botName || 'Bot'}\` *\n\nJe n'ai pas pu formuler une réponse cohérente. Veuillez reformuler votre requête.` }, { quoted: message });
           return;
         }
 
         // Detect mentions in AI response (basic check) or default to sender
         const responseMentions = [sender, ...mentionedJids];
 
-        if (!this.cloakMode) {
-          const { calculateTypingDuration, simulateTyping } = require('../utils/helpers');
-          const typingDuration = calculateTypingDuration(finalResponse.length);
-          await simulateTyping(this.sock, chatId, typingDuration);
-        }
         // --- VOICE MIXING LOGIC ---
         const groupSettings = isGroup ? await this.getGroupSettings(chatId) : null;
         const voiceAllowed = !isGroup || (groupSettings && groupSettings.voiceEnabled); // DM always allowed, Group depends on settings
@@ -1475,9 +1432,6 @@ class PsychoBot extends EventEmitter {
           (isExplicitVoiceRequest || Math.random() < 0.50); // Explicit OR 50% random chance
 
         if (shouldVoice) {
-          await this.sock.sendPresenceUpdate('recording', chatId).catch(() => { });
-          // Small delay to simulate recording
-          await delay(1500);
           const audioPath = await VoiceManager.generateAudio(finalResponse);
           if (audioPath) {
             await this.sendMessage(chatId, {
@@ -1492,7 +1446,10 @@ class PsychoBot extends EventEmitter {
         await this.sendMessage(chatId, {
           text: finalResponse,
           mentions: responseMentions
-        }, { quoted: message, noDelay: true }); // Avoid double delay since simulateTyping ran above
+        }, { quoted: message });
+
+        // --- SaaS USAGE UPDATE ---
+        this.updateSaaSUsage('AI_RESPONSE');
       }
       return;
     }
@@ -1546,6 +1503,14 @@ class PsychoBot extends EventEmitter {
 
     const plugin = this.commands.get(cmdName);
     if (plugin) {
+      // --- SaaS PLAN CHECK ---
+      if (this.account) {
+        const canRun = await PlanService.canPerformAction(this.account, 'COMMAND');
+        if (!canRun) {
+          return await this.sendSafeMessage(chatId, `⚠️ *Quota Atteint: Plan ${this.account.plan}*\nVous avez atteint votre limite journalière. Veuillez passer au plan supérieur pour continuer.`);
+        }
+      }
+
       try {
         // Basic permission checks
         if (plugin.isOwner && !isOwner) {
@@ -1571,6 +1536,10 @@ class PsychoBot extends EventEmitter {
           bot: this,
           config: CONFIG
         });
+
+        // --- SaaS USAGE UPDATE ---
+        this.updateSaaSUsage('COMMAND');
+
         return;
       } catch (error) {
         log.error(`Error executing plugin command ${cmdName}:`, error.message);
@@ -1889,11 +1858,6 @@ class PsychoBot extends EventEmitter {
           }
 
           if (messageText) {
-            // Simulation de frappe pour immersion
-            await this.sock.sendPresenceUpdate('composing', groupId);
-            const typingDelay = Math.min(5000, 1500 + messageText.length * 20); // Dynamic delay
-            await new Promise(resolve => setTimeout(resolve, typingDelay));
-
             await this.sendMessage(groupId, { text: messageText });
             // Small cooldown between groups
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1933,6 +1897,9 @@ class PsychoBot extends EventEmitter {
     }, { timezone: "Africa/Douala" });
   }
 
+  /**
+   * Periodically posts an automated status update.
+   */
   async startAutoStatus() {
     log.info('📱 Auto Status updates activated (Every 6h)');
 
@@ -1947,46 +1914,11 @@ class PsychoBot extends EventEmitter {
         if (statusText) {
           await this.sendMessage('status@broadcast', {
             text: statusText,
-            backgroundColor: '#315558', // XyberClan Teal
+            backgroundColor: '#315558',
             font: 2 // Action Font
           });
         }
       }
     }, { timezone: "Africa/Douala" });
   }
-
-  /**
-   * GHOST-CORE: Human Activity Simulator (Phase 9)
-   * Periodically performs background actions to look like a real user.
-   */
-  async startGhostCore() {
-    log.info('👻 GHOST-CORE: Anti-Ban non-linear activity active');
-
-    const pulse = async () => {
-      try {
-        if (!this.sock || this.cloakMode) return;
-
-        // 1. Simulate "Online" status
-        await this.sock.sendPresenceUpdate('available');
-
-        // Random "thinking/typing" delay
-        await delay(Math.floor(Math.random() * 5000) + 2000);
-
-        await this.sock.sendPresenceUpdate('unavailable');
-        log.debug('👻 GHOST-CORE: Performed non-linear activity pulse.');
-      } catch (e) {
-        log.warn('GHOST-CORE pulse inhibited:', e.message);
-      }
-
-      // Random interval for next pulse (6 to 18 minutes)
-      const nextPulse = (Math.floor(Math.random() * 12) + 6) * 60 * 1000;
-      this.ghostTimeout = setTimeout(pulse, nextPulse);
-    };
-
-    pulse();
-  }
 }
-
-
-
-module.exports = PsychoBot;

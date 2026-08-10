@@ -14,8 +14,9 @@ class BotManager extends EventEmitter {
             return this.instances.get(sessionId);
         }
 
-        log.info(`Starting new session: ${sessionId} (Name: ${options.botName || 'Default'})`);
-        const bot = new PsychoBot(sessionId, options);
+        const accountId = options.accountId || sessionId;
+        log.info(`Starting SaaS session: ${sessionId} (Account: ${accountId})`);
+        const bot = new PsychoBot(sessionId, { ...options, accountId });
 
         // Setup listener for QR and Status
         bot.on('connection.update', (update) => {

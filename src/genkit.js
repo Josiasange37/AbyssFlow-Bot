@@ -30,7 +30,7 @@ if (require.main === module) {
     console.log('🚀 Running Genkit Hello Flow test...');
     console.log('📍 API key configured:', process.env.GOOGLE_GENAI_API_KEY ? '✅' : '❌');
 
-    helloFlow('Josias')
+    helloFlow('Testing')
         .then((result) => console.log('✅ Test completed! Response:', result))
         .catch((err) => console.error('❌ Error:', err.message));
 }

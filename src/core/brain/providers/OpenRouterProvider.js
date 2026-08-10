@@ -17,7 +17,7 @@ class OpenRouterProvider {
             apiKey: this.keys[0],
             defaultHeaders: {
                 "HTTP-Referer": "https://abyssflow.bot",
-                "X-Title": "Diane Assistant",
+                "X-Title": "AbyssFlow Bot",
             }
         });
 
@@ -37,7 +37,7 @@ class OpenRouterProvider {
 
         try {
             const messages = [
-                { role: "system", content: systemPrompt || "You are Diane, a helpful assistant." },
+                { role: "system", content: systemPrompt || "You are a helpful, honest AI assistant." },
                 ...history.map(msg => ({
                     role: msg.role === 'user' ? 'user' : 'assistant',
                     content: msg.text

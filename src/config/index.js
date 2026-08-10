@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const CONFIG = {
-  botName: process.env.BOT_NAME || 'Diane',
+  botName: process.env.BOT_NAME || 'AbyssFlow Bot',
   owners: process.env.BOT_OWNERS
     ? process.env.BOT_OWNERS.split(',').map((v) => v.trim()).filter(Boolean)
     : [],
@@ -16,9 +16,9 @@ const CONFIG = {
   reconnectMax: Number(process.env.RECONNECT_MAX_DELAY_MS) || 15000,
   logLevel: process.env.LOG_LEVEL || 'info',
   creator: {
-    name: process.env.CREATOR_NAME || 'Josias',
-    bio: process.env.CREATOR_BIO || 'Dev of Psycho Bot',
-    tagline: process.env.CREATOR_TAGLINE || 'Casual bot for cool people',
+    name: process.env.CREATOR_NAME || 'AbyssFlow Bot',
+    bio: process.env.CREATOR_BIO || '',
+    tagline: process.env.CREATOR_TAGLINE || 'A helpful WhatsApp assistant',
     location: process.env.CREATOR_LOCATION || 'Cameroun',
     skills: process.env.CREATOR_SKILLS || 'JS, Node, React',
     linkedin: process.env.CREATOR_LINKEDIN || '',
@@ -31,7 +31,7 @@ const CONFIG = {
     youtube: process.env.CREATOR_YOUTUBE || '',
     githubUsername: process.env.CREATOR_GITHUB_USERNAME || '',
     githubBio: process.env.CREATOR_GITHUB_BIO || '',
-    CREATOR_STARTUP: process.env.CREATOR_STARTUP || 'Psycho Corp',
+    CREATOR_STARTUP: process.env.CREATOR_STARTUP || 'AbyssFlow',
     CREATOR_STARTUP_URL: process.env.CREATOR_STARTUP_URL || '',
     CONTACT_EMAIL: process.env.CONTACT_EMAIL || '',
   },

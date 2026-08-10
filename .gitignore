@@ -3,6 +3,9 @@ node_modules/
 .wwebjs_auth/
 .wwebjs_cache/
 data/
+session/
+output/
+web/.next/
 *.log
 *.session.json
 .DS_Store

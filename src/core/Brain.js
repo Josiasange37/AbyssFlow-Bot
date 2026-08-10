@@ -207,15 +207,6 @@ class PsychoBrain {
             return results ? `Résultats:\n${results}` : "Rien trouvé.";
         }
 
-        // 3. Selfie (New Feature)
-        const selfieTriggers = ['envoie une photo de toi', 't\'es flou', 'ta tête', 'selfie', 'montre toi'];
-        if (selfieTriggers.some(k => text.toLowerCase().includes(k)) && text.length < 50) {
-            const selfiePrompt = "A realistic cyberpunk anime boy, 18 years old, hoodies, glowing blue eyes, coding in a dark room with neon lights, messy hair, looking at camera";
-            const img = await MistralProvider.generateImage(selfiePrompt);
-            if (img) return `${img}\n\nC'est moi. Bg ou pas ? 😎`;
-        }
-
-
         // 4. Internet Context
         let searchContext = "";
         const searchKeywords = ['news', 'actualité', 'meteo', 'météo', 'bourse', 'score'];
@@ -280,15 +271,7 @@ class PsychoBrain {
 
         if (!response) return "Oops, cerveaux HS. Réessaie dans 10 secondes. 🧠❌";
 
-        // 7. Update Memory
-        if (response.includes('[MEMORY:')) {
-            const memMatch = response.match(/\[MEMORY: (.*?)\]/);
-            if (memMatch) Persona.setFriendFact(userName, memMatch[1]);
-        }
-
-
-
-        // 8. Store Significant Interactions in Long-Term Memory
+        // 6. Store Significant Interactions in Long-Term Memory
         await Memory.storeLongTerm(text, response, userName);
 
         chatHistory.push({ role: "assistant", text: response });
@@ -310,7 +293,7 @@ class PsychoBrain {
 
         let prompt;
         const baseRequest = `Génère une citation unique, courte (1-2 phrases) et percutante dans le style "Aphorisme Professionnel". 
-        C'est pour l'équipe XyberClan.
+        C'est pour le groupe.
         Humeur du jour : ${mood.name} (${mood.instructions}).
         Format : Pas de salutations, juste la citation.
         Contexte récent du groupe : ${recentContext || "Calme"}`;
@@ -325,7 +308,7 @@ class PsychoBrain {
 
         if (this.isProviderAvailable('groq')) {
             try {
-                const response = await GroqProvider.process(prompt, [], "Tu es Diane, une assistante exécutive dont la sagesse est profonde et le style impeccable. Tes mots doivent marquer les esprits.");
+                const response = await GroqProvider.process(prompt, [], "You are a concise, neutral AI assistant.");
                 return response;
             } catch (e) {
                 log.error(`Auto message generation failed: ${e.message}`);
@@ -337,7 +320,7 @@ class PsychoBrain {
     async generateStatus() {
         // Use Groq for status
         if (this.isProviderAvailable('groq')) {
-            const prompt = "Génère un statut WhatsApp court (1 phrase cool) pour Psycho Bot.";
+            const prompt = "Génère un statut WhatsApp court (1 phrase cool) pour un assistant.";
             try {
                 return await GroqProvider.process(prompt, [], "You are a creative bot.");
             } catch (e) { }
@@ -359,7 +342,7 @@ class PsychoBrain {
         if (!this.githubClient) throw new Error('GITHUB_NOT_READY');
         const content = [{ type: "text", text: text || "Analyze." }];
         if (media) content.push({ type: "image_url", image_url: { url: `data:${media.mimetype};base64,${media.buffer.toString('base64')}` } });
-        const messages = [{ role: "system", content: "Act like Psycho Bot." }, ...chatHistory.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || "" })), { role: "user", content: content }];
+        const messages = [{ role: "system", content: "You are a helpful AI assistant." }, ...chatHistory.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || "" })), { role: "user", content: content }];
         const completion = await this.githubClient.chat.completions.create({ model: "gpt-4o-mini", messages: messages, max_tokens: 512 });
         return completion.choices[0]?.message?.content || "";
     }
